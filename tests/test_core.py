@@ -75,7 +75,8 @@ def test_headlines_follow_the_table():
     assert "No new forest clearing" in card.headline({"status": "NONE", "checks": {"A": {"pass": False}}})[0]
     assert "Clouds" in card.headline({"status": "CLOUDY", "checks": {}})[0]
     t = card.headline(_report(A={"pass": True}, B={"pass": True}))
-    assert "Possible forest clearing" in t[0] and "not yet confirmed" in t[0]
+    assert "Possible forest clearing" in t[0]
+    assert any("not yet confirmed" in x for x in t)
     t = card.headline(_report(A={"pass": True}, B={"pass": True}, C={"pass": True, "radd_first": "2024-02-01"}))
     assert "confirmed by radar alerts from 2024-02-01" in t[0] and "Cause not confirmed" in t[0]
     t = card.headline(_report(A={"pass": True}, B={"pass": True}, C={"pass": True}, D={"pass": True},

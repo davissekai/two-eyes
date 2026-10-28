@@ -64,8 +64,13 @@ def test_demo_report_shape():
 
 def test_headline_of_demo_report():
     h = card.headline(demo.demo_report())
-    assert "Our check only, not yet confirmed" in "\n".join(h)
+    assert h[0] == "Possible forest clearing, 19 km upstream."
+    assert "since early 2023" in h[1] and "17.0 ha" in h[1]
+    assert "our check only, not yet confirmed" in h[1]
     assert "muddy brown" in "\n".join(h) and not any("%" in x for x in h)
+    share = card.share_text(demo.demo_report(), use_llm=False)
+    assert "Possible forest clearing, 19 km upstream." in share
+    assert "our check only, not yet confirmed" in share
 
 
 def test_pipeline_run_offline_demo(tmp_path, monkeypatch):

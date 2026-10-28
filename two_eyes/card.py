@@ -1,7 +1,7 @@
 """Evidence card: badges (never percentages), honest headline, PNG for WhatsApp.
 
 Field Evidence look (atelier brand kit, direction A): graphite card, bone type,
-silt labels, laterite accents, machine-lime contours/boxes/finding, WhatsApp pill.
+silt labels, laterite accents, machine-lime scar outlines only; WhatsApp share lives in the UI, not the PNG.
 """
 import datetime as dt
 import os
@@ -56,8 +56,10 @@ def headline(r):
         return [f"A new forest clearing ({s['area_ha']:.1f} ha) was found nearby, but it drains elsewhere,",
                 "not to this bridge."]
     if not Cc:
-        lines.append(f"Possible forest clearing upstream since early {C.BEFORE[0][:4]} ({where}). "
-                     "Our check only, not yet confirmed.")
+        # Lead + silt subline (Field Evidence card layout)
+        lines.append(f"Possible forest clearing, {s['distance_km']:.0f} km upstream.")
+        lines.append(
+            f"since early {C.BEFORE[0][:4]} · {s['area_ha']:.1f} ha · our check only, not yet confirmed")
     else:
         first = k["C"].get("radd_first")
         conf = f"radar alerts from {first}" if first else "Global Forest Watch loss data"
@@ -149,39 +151,51 @@ def _emphasis_phrase(r):
     return "Bare earth by the river."
 
 
+def _sat_tile(rgb, mask, darken=0.85):
+    """Satellite lead for the card: strip painted scar fills, darken ~15%, ground shows through."""
+    out = np.asarray(rgb, dtype=np.float32).copy()
+    if mask is not None and np.any(mask):
+        # Replace orange/yellow paint with a muted bare-earth tone from luminance
+        # so only the lime contour (drawn by render) marks the scar — no fill, no orange cores.
+        pix = out[mask]
+        lum = 0.30 * pix[:, 0] + 0.59 * pix[:, 1] + 0.11 * pix[:, 2]
+        scale = np.clip(lum / 190.0, 0.45, 1.15)
+        out[mask, 0] = 118.0 * scale
+        out[mask, 1] = 104.0 * scale
+        out[mask, 2] = 46.0 * scale
+    out *= darken
+    return np.clip(out, 0, 255).astype(np.uint8)
+
+
 def render(r, path):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib.gridspec import GridSpec
-    from matplotlib.patches import FancyBboxPatch, Rectangle
+    from matplotlib.patches import Rectangle
     
     SERIF, BODY, MONO = _register_fonts()
     fig = plt.figure(figsize=(7.2, 9.6), dpi=150, facecolor=GRAPHITE)
     fig.subplots_adjust(left=0.0, right=1.0, top=1.0, bottom=0.0)
     gs = GridSpec(5, 1, figure=fig, height_ratios=[2.65, 2.75, 1.95, 1.35, 0.9], hspace=0.06)
-    fig.add_artist(Rectangle((0, 0), 1, 1, transform=fig.transFigure, fill=False,
-                             edgecolor=LIME, linewidth=4, clip_on=False))
+    # No lime border around the whole card (chrome lives in the UI, not the PNG).
 
-    # --- 1. lead satellite panel: rgb_after + lime contour + illustrative boxes ---
+    # --- 1. lead satellite panel: darkened ground + thin 2px lime scar outlines only ---
     ax = fig.add_subplot(gs[0]); ax.axis("off")
-    img = (r.get("scar") or {}).get("rgb_after")
+    s = r.get("scar") or {}
+    img = s.get("rgb_after")
+    mask = s.get("mask")
     if img is not None:
-        ax.imshow(img, aspect="auto")
+        ax.imshow(_sat_tile(img, mask, darken=0.85), aspect="auto")
     else:
         ax.text(0.5, 0.5, "no image", ha="center", va="center", color=SILT,
                 fontsize=9, transform=ax.transAxes)
-    s = r.get("scar") or {}
-    mask = s.get("mask")
     if mask is not None and mask.any():
-        ax.contour(mask.astype(float), levels=[0.5], colors=[LIME], linewidths=1.4)
-    boxes = s.get("sam_boxes") or []
-    for box in boxes:
-        l, t, rr, b = box
-        ax.add_patch(Rectangle((l, t), rr - l, b - t, fill=False, edgecolor=LIME, linewidth=1.6))
+        # ~2px at 150 dpi: linewidth_pt = 2 * 72 / 150 ≈ 0.96
+        ax.contour(mask.astype(float), levels=[0.5], colors=[LIME], linewidths=1.0)
     illustrative = bool(r.get("demo") or s.get("boxes_illustrative"))
-    if illustrative and boxes:
-        ax.text(0.03, 0.06, "Illustrative boxes, not SAM output", transform=ax.transAxes,
+    if illustrative and mask is not None and mask.any():
+        ax.text(0.03, 0.06, "Illustrative outlines, not live SAM", transform=ax.transAxes,
                 fontsize=7.5, color=LIME, family=MONO, va="bottom",
                 bbox=dict(boxstyle="round,pad=0.45", fc=GRAPHITE, ec=LIME, alpha=0.55))
     # chip: EVIDENCE CARD
@@ -208,20 +222,27 @@ def render(r, path):
         mk_ax.plot(*zip(xy1, xy2), color=LIME, lw=1.6, clip_on=False)
     mk_ax.plot([0.85, 2.25], [0.5, 0.62], color=LIME, lw=1.4)
 
-    # --- 2. headline (Instrument Serif; italic lime emphasis phrase) ---
+    # --- 2. headline (Instrument Serif ~1.05 lh) + one small Geist silt subline ---
     ax = fig.add_subplot(gs[1]); ax.axis("off")
     h_lines = headline(r)
-    lead_lines = textwrap.wrap(h_lines[0], 46)
-    y = 1.0
+    lead = h_lines[0] if h_lines else ""
+    lead_lines = textwrap.wrap(lead, 42)
+    y = 0.98
     for line in lead_lines:
-        ax.text(0.02, y, line, fontsize=21, va="top", family=SERIF, color=BONE)
-        y -= 0.20
-    ax.text(0.02, y - 0.03, _emphasis_phrase(r), fontsize=22, family=SERIF,
-            fontstyle="italic", color=LIME, va="top")
-    rest = " ".join(h_lines[1:])
+        ax.text(0.02, y, line, fontsize=22, va="top", family=SERIF, color=BONE,
+                linespacing=1.05)
+        y -= 0.22 * 1.05
+    sub = h_lines[1] if len(h_lines) > 1 else ""
+    # Prefer the silt meta line when present (demo: since early 2023 · 17.0 ha · …)
+    if sub and ("·" in sub or "our check only" in sub.lower() or sub.startswith("since ")):
+        ax.text(0.02, y - 0.02, sub, fontsize=10, va="top", family=BODY, color=SILT)
+        y -= 0.16
+        rest = " ".join(h_lines[2:])
+    else:
+        rest = " ".join(h_lines[1:])
     if rest:
-        ax.text(0.02, y - 0.20, textwrap.fill(rest, 92), fontsize=10, va="top", family=BODY,
-                color=BONE, linespacing=1.5)
+        ax.text(0.02, y - 0.04, textwrap.fill(rest, 92), fontsize=10, va="top", family=BODY,
+                color=BONE, linespacing=1.45)
 
     # --- 3. mono rows: RIVER | LOCATION | COMPARED | FINDING ---
     ax = fig.add_subplot(gs[2]); ax.axis("off")
@@ -255,20 +276,15 @@ def render(r, path):
         ax.text(x + 0.085, y, name, fontsize=9, family=BODY, color=label_col,
                 va="center", alpha=0.85 if v else 0.7)
 
-    # --- 5. footer ---
+    # --- 5. footer (Share on WhatsApp stays in the Gradio UI only — not on the PNG) ---
     ax = fig.add_subplot(gs[4]); ax.axis("off")
     cop_years = f"{C.BEFORE[0][:4]}, {C.AFTER[0][:4]}"
-    ax.text(0.02, 0.06, textwrap.fill(
+    ax.text(0.02, 0.18, textwrap.fill(
         f"Contains modified Copernicus Sentinel data {cop_years} · checked {r['date']}", 76),
         fontsize=6.5, family=MONO, color=SILT, va="bottom")
-    ax.text(0.02, 0.42, "Powered by", fontsize=6.5, family=MONO, color=SILT, va="bottom")
-    ax.text(0.13, 0.42, "Meta SAM 3.1 + Muse Spark", fontsize=6.5, family=MONO, color=BONE,
+    ax.text(0.02, 0.55, "Powered by", fontsize=6.5, family=MONO, color=SILT, va="bottom")
+    ax.text(0.13, 0.55, "Meta SAM 3.1 + Muse Spark", fontsize=6.5, family=MONO, color=BONE,
             va="bottom")
-    pill = FancyBboxPatch((0.66, 0.32), 0.33, 0.2, boxstyle=f"round,pad=0.015,rounding_size=0.012",
-                          transform=ax.transAxes, fc=WA, ec="none", mutation_aspect=9.6 / 7.2)
-    ax.add_patch(pill)
-    ax.text(0.825, 0.42, "Share on WhatsApp", fontsize=6.5, family=BODY, color="#0b2e17",
-            weight="bold", ha="center", va="center")
     fig.savefig(path, facecolor=GRAPHITE)
     plt.close(fig)
     return path

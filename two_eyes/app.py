@@ -77,18 +77,29 @@ body {{background:{BASE} !important;}}
 .gradio-container .form, .gradio-container .block {{
   background-color:{PANEL} !important; border-color:{RULER} !important; border-radius:14px !important;
 }}
-.gradio-container textarea, .gradio-container input, .gradio-container select {{
-  background:{PANEL2} !important; color:{BONE} !important; border:1px solid {RULER} !important;
+/* Graphite fields, Bone border + text — bridge dropdown matches lat/lon inputs */
+.gradio-container textarea, .gradio-container input, .gradio-container select,
+.gradio-container .wrap input, .gradio-container .wrap .secondary-wrap,
+.gradio-container [data-testid="dropdown"] , .gradio-container [data-testid="dropdown"] input,
+.gradio-container .container > .wrap, .gradio-container .input-container,
+.gradio-container .dropdown-container, .gradio-container .wrap.full {{
+  background:{BASE} !important; color:{BONE} !important; border:1px solid {BONE} !important;
   font-size:15px !important; border-radius:10px !important;
+  box-shadow:none !important;
 }}
 .gradio-container textarea::placeholder, .gradio-container input::placeholder {{
   color:{SILT} !important; opacity:.65;}}
-.gradio-container ul.options, .gradio-container ul[class*='option'] {{
-  background:{PANEL2} !important; border-color:{RULER} !important;}}
-.gradio-container ul.options li, .gradio-container ul[class*='option'] li {{color:{BONE} !important;}}
-.gradio-container ul.options li:hover, .gradio-container ul[class*='option'] li:hover {{
-  background:{PANEL} !important;}}
-.gradio-container .dropdown-arrow {{color:{LIME} !important;}}
+.gradio-container ul.options, .gradio-container ul[class*='option'],
+.gradio-container [role="listbox"] {{
+  background:{BASE} !important; border:1px solid {BONE} !important; color:{BONE} !important;}}
+.gradio-container ul.options li, .gradio-container ul[class*='option'] li,
+.gradio-container [role="option"] {{color:{BONE} !important; background:{BASE} !important;}}
+.gradio-container ul.options li:hover, .gradio-container ul[class*='option'] li:hover,
+.gradio-container [role="option"]:hover {{
+  background:{PANEL} !important; color:{BONE} !important;}}
+.gradio-container .dropdown-arrow, .gradio-container .icon-wrap {{color:{BONE} !important;}}
+#col-controls .wrap, #col-controls input, #col-controls select {{
+  background:{BASE} !important; color:{BONE} !important; border-color:{BONE} !important;}}
 
 /* primary button: bone on graphite, large tap target */
 .gradio-container button.primary {{
