@@ -11,4 +11,5 @@ Files: 00 brand board, 01 logo, 02 app icon, 03 poster, 04 X card, 05 evidence c
 ## Credits
 - Bridge aerial: "Bridge over destroyed river" by Goldenwabbit, Wikimedia Commons, CC BY-SA 4.0. Lime marks on it are illustrative.
 - Satellite: Contains modified Copernicus Sentinel data 2017, 2026 (Offin River, Dunkwa-on-Offin). Outlines show change, not cause.
-- Other Wikimedia Commons photos are CC BY-SA 4.0; see the full source log kept with the imagery.
+- Evidence card (05) photo: "Galamsey in Ghana" by Crosstemplejay, Wikimedia Commons, CC BY-SA 4.0.
+- All PNGs derived from these photos are shared under CC BY-SA 4.0. Full source log in CREDITS.md.

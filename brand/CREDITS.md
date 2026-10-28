@@ -2,6 +2,8 @@
 
 Assets built from the Goldenwabbit bridge photo (03, 04, 07, 08 and others using it) are share-alike edits and are shared under CC BY-SA 4.0 with the original credit: "Bridge over destroyed river" by Goldenwabbit, Wikimedia Commons, CC BY-SA 4.0.
 
+05-evidence-card.png uses "Galamsey in Ghana" by Crosstemplejay, Wikimedia Commons, CC BY-SA 4.0, and is shared under CC BY-SA 4.0.
+
 Satellite assets: Contains modified Copernicus Sentinel data 2017, 2026.
 
 Full source log:
