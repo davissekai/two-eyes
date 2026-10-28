@@ -34,16 +34,17 @@ RULER = "rgba(21,19,15,.20)"   # graphite ~20% field/panel borders
 FIELD_BORDER = "rgba(21,19,15,.20)"
 
 _EYES_MARK = (
+    # On bone: sky-eye ring + ticks in Graphite; lime only as small pupil with Graphite outline (no plate)
     '<svg viewBox="0 0 220 110" width="150" height="75" xmlns="http://www.w3.org/2000/svg" '
     'aria-label="Two Eyes mark">'
     '<circle cx="55" cy="55" r="44" fill="none" stroke="#15130F" stroke-width="5"/>'
     '<circle cx="55" cy="55" r="11" fill="#9C5A34"/>'
-    '<circle cx="165" cy="55" r="44" fill="none" stroke="#D4FF3A" stroke-width="5"/>'
-    '<g stroke="#D4FF3A" stroke-width="4">'
+    '<circle cx="165" cy="55" r="44" fill="none" stroke="#15130F" stroke-width="5"/>'
+    '<g stroke="#15130F" stroke-width="4">'
     '<line x1="165" y1="3" x2="165" y2="17"/><line x1="165" y1="93" x2="165" y2="107"/>'
     '<line x1="113" y1="55" x2="127" y2="55"/><line x1="203" y1="55" x2="217" y2="55"/></g>'
-    '<circle cx="165" cy="55" r="11" fill="#D4FF3A"/>'
-    '<path d="M66 55 C 90 30, 110 80, 154 55" fill="none" stroke="#D4FF3A" stroke-width="3" '
+    '<circle cx="165" cy="55" r="11" fill="#D4FF3A" stroke="#15130F" stroke-width="2"/>'
+    '<path d="M66 55 C 90 30, 110 80, 154 55" fill="none" stroke="#15130F" stroke-width="3" '
     'stroke-dasharray="6 6"/></svg>'
 )
 
