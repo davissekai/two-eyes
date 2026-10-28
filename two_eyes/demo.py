@@ -1,9 +1,10 @@
-"""Demo mode: an offline, cached Birim / Atewa result with the same shape as a live run.
+"""Demo mode: an offline, cached Birim result with the same shape as a live run.
 
 Turned on by DEMO_MODE=1, or whenever a live run could not work here (no Meta Model API key,
 or Earth Engine not usable). No Earth Engine and no Meta API calls are made in demo mode.
+The bridge still is an illustrative painted mask and the "refined" boxes are invented for the
+UI demo; the card and banner label both as illustrative.
 """
-import datetime as dt
 import json
 import os
 import time
@@ -17,12 +18,19 @@ from . import sky
 
 ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 
-# The recorded run (28 Oct 2026, see README): N4 bridge over the Birim, lead scar 17 ha / ~19 km upstream.
+# The recorded run (28 Oct 2026, see README "End-to-end demo"): N4 bridge over the Birim,
+# 24 NDVI candidates, 8 refined with SAM 3.1. Lead scar 17.0 ha, ~19 km upstream.
 BRIDGE = {"name": "Birim, N4 bridge", "lat": 6.28442, "lon": -0.46118}
 SCAR = {"lat": 6.45440, "lon": -0.48330, "area_ha": 17.0, "distance_km": 19.0,
         "ndvi_before": 0.71, "ndvi_after": 0.17, "cloudy": 0.06}
-OUTLINES = "SAM 3.1 box prompts"
-CREDIT = "Stand-in view: Pra River from Beposo bridge, 2014. Wikimedia Commons, CC BY-SA 3.0"
+# The bundled still is the Goldenwabbit bridge photo, not the old Pra/Beposo clip.
+CREDIT = "Photo: Goldenwabbit, Wikimedia Commons, CC BY-SA 4.0"
+# Recorded-run date (README "End-to-end demo (27-28 Oct 2026)", Birim lead report);
+# fixed so the demo card never drifts to today's date.
+DATE = "2026-10-28"
+OUTLINES = "illustrative painted mask + invented boxes (demo; not live SAM output)"
+# Copernicus years follow the frozen scene windows: config BEFORE is 2023, config AFTER is 2026.
+COPERNICUS_CREDIT = "Contains modified Copernicus Sentinel data 2023, 2026"
 OUT_DIR = "two_eyes_out"
 
 
@@ -56,7 +64,11 @@ def _scar_mask(rgb):
 
 
 def _sam_boxes(rgb, n=3, pad=4):
-    """Plausible SAM 3.1 refined boxes (l, t, r, b) around the yellow scar mask components."""
+    """Invented UI-demo boxes (l, t, r, b) around the yellow scar mask components.
+
+    Not SAM output: this only draws plausible boxes over the painted mask so the UI
+    shows where a SAM 3.1 pass could sit. Consumers must label them illustrative
+    (scar['boxes_illustrative'] / card "DEMO · ILLUSTRATIVE" chip)."""
     mask = _scar_mask(rgb)
     _, lab = sky.patches(mask)
     h, wD = mask.shape
@@ -78,8 +90,10 @@ def demo_report():
     sat_before = np.asarray(Image.open(_asset("sat_before.jpg")).convert("RGB"))
     sat_after = np.asarray(Image.open(_asset("sat_after.jpg")).convert("RGB"))
     return {
-        "date": dt.date.today().isoformat(),
+        # Recorded-run date (README "End-to-end demo (27-28 Oct 2026)"), not today's date.
+        "date": DATE,
         "demo": True,
+        "credit_sat": COPERNICUS_CREDIT,
         "bridge": dict(BRIDGE),
         "periods": {"before": C.BEFORE, "now": C.AFTER},
         "status": "SCAR",
@@ -93,6 +107,7 @@ def demo_report():
         ],
         "scar": {"lat": SCAR["lat"], "lon": SCAR["lon"], "area_ha": SCAR["area_ha"],
                  "cloudy": SCAR["cloudy"], "outline_method": OUTLINES,
+                 "boxes_illustrative": True,
                  "ndvi_before": SCAR["ndvi_before"], "ndvi_after": SCAR["ndvi_after"],
                  "distance_km": SCAR["distance_km"], "rgb_before": sat_before,
                  "rgb_after": sat_after, "mask": _scar_mask(sat_after),
@@ -108,8 +123,10 @@ def demo_report():
         "ground": {"water_found": True, "muddy": True, "label": "muddy brown", "b_star": 34.6,
                    "label_source": "Muse Spark (image understanding); recorded run",
                    "muse_quote": "muddy brown",
-                   "method": "SAM 3.1 (video, concept prompt 'river water'); recorded run",
+                   # The bundled still is an illustrative painted water mask, not SAM 3.1 output.
+                   "method": "Illustrative painted water mask on the bridge frame (demo; not SAM output)",
                    "frames_used": 10, "still": _still(), "credit": CREDIT},
+        # README recorded run: "24 NDVI candidates, 8 refined with SAM 3.1".
         "meta": {"sam_refined": 8, "muse_quote": "muddy brown"},
     }
 

@@ -30,10 +30,24 @@ def test_share_text_falls_back_to_template_without_key(monkeypatch):
     assert "No new forest clearing" in card.share_text(r)   # no Meta call, no crash
 
 
-def test_poster_palette_constants():
-    assert card.CREAM == "#fff8ea" and card.GOLD == "#ffd600" and card.ORANGE == "#ff7a00"
-    assert card.FOREST == "#0f2a1a" and card.PANEL_GREEN == "#163d26"
-    assert card.CONTOUR_COLOR == "#e8432e"
+def test_field_evidence_palette_constants():
+    assert card.GRAPHITE == "#15130F" and card.BONE == "#F2EDE4" and card.SILT == "#C9A27E"
+    assert card.LATERITE == "#9C5A34" and card.LIME == "#D4FF3A" and card.WA == "#25D366"
+    assert card.CONTOUR_COLOR == card.LIME
+
+
+def test_demo_credit_and_recorded_run_date():
+    r = demo.demo_report()
+    assert "Goldenwabbit" in r["ground"]["credit"] and "CC BY-SA 4.0" in r["ground"]["credit"]
+    assert r["date"] == "2026-10-28"          # recorded run, not today
+    assert "Copernicus" in r["credit_sat"] and "2023" in r["credit_sat"] and "2026" in r["credit_sat"]
+
+
+def test_demo_sam_boxes_are_labelled_illustrative():
+    r = demo.demo_report()
+    assert r["scar"]["boxes_illustrative"] is True
+    assert "not live SAM output" in r["scar"]["outline_method"]
+    assert "not SAM output" in r["ground"]["method"]
 
 
 def test_demo_report_shape():

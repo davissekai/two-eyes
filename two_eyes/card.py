@@ -1,9 +1,10 @@
 """Evidence card: badges (never percentages), honest headline, PNG for WhatsApp.
 
-Poster look (see the campaign poster): cream card, gold border, forest-green type,
-orange accents, scar contour in alert red.
+Field Evidence look (atelier brand kit, direction A): graphite card, bone type,
+silt labels, laterite accents, machine-lime contours/boxes/finding, WhatsApp pill.
 """
 import datetime as dt
+import os
 import textwrap
 
 import numpy as np
@@ -13,21 +14,24 @@ from . import config as C
 BADGES = [("A", "New forest scar"), ("B", "Drains to this bridge"), ("C", "Alerts agree"),
           ("D", "Looks like mining"), ("E", "River muddier below"), ("F", "Inside a protected area")]
 
-# --- poster palette ---
-CREAM = "#fff8ea"
-GOLD = "#ffd600"
-ORANGE = "#ff7a00"
-FOREST = "#0f2a1a"
-PANEL_GREEN = "#163d26"
-ALERT = CONTOUR_COLOR = "#e8432e"
-MUTED_FOOT = "#8b8474"
-RULE_EDGE = "#d5cbba"
+# --- Field Evidence palette ---
+GRAPHITE = "#15130F"
+BONE = "#F2EDE4"
+SILT = "#C9A27E"
+LATERITE = "#9C5A34"
+LIME = "#D4FF3A"          # machine accent: masks, boxes, badges, finding
+WA = "#25D366"            # WhatsApp share pill only
+CONTOUR_COLOR = LIME      # mask contours / scar boxes are machine vision -> lime
+RULE_EDGE = "rgba(242,237,228,.18)"
+RULE_EDGE_HEX = "#4a443b"   # matplotlib spines need an opaque colour
 
-# badge styles: value -> (facecolor, symbol colour, label colour)
+FONTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "fonts")
+
+# badge styles: value -> (facecolour, symbol colour, label colour)
 _BADGES_STYLE = {
-    True: (GOLD, "#1e1e00", FOREST),          # pass: gold filled, dark text
-    False: ("#f2ecdb", "#a89d89", "#857d6c"),  # fail: muted on cream
-    None: ("#f6f3e9", "#a49d8e", "#8a8474"),   # none: grey dash on cream
+    True: (LIME, GRAPHITE, BONE),                    # pass: lime chip, bone label
+    False: ("none", SILT, SILT),                     # fail: silt, muted
+    None: ("none", SILT, SILT),                      # unknown: silt dash
 }
 
 
@@ -118,86 +122,153 @@ def _badge_symbol(v):
     return {True: "✓", False: "✗", None: "–"}[v]
 
 
+def _register_fonts():
+    """(serif, body, mono) family names, registered from the bundled TTFs."""
+    from matplotlib import font_manager as fm
+    names = []
+    for f in ("InstrumentSerif-Regular.ttf", "InstrumentSerif-Italic.ttf",
+              "Geist-VariableFont_wght.ttf", "JetBrainsMono-VariableFont_wght.ttf"):
+        p = os.path.join(FONTS_DIR, f)
+        if os.path.isfile(p):
+            fm.fontManager.addfont(p)
+    def fam(fname):
+        return fm.FontProperties(fname=os.path.join(FONTS_DIR, fname)).get_name()
+    return fam("InstrumentSerif-Regular.ttf"), fam("Geist-VariableFont_wght.ttf"), \
+        fam("JetBrainsMono-VariableFont_wght.ttf")
+
+
+def _emphasis_phrase(r):
+    """Short italic lime phrase for the headline, from the checks (demo run: mining digs)."""
+    k = r["checks"]
+    if k.get("D", {}).get("pass"):
+        return "Signs of mining upstream."
+    if k.get("E", {}).get("pass"):
+        return "The river runs brown."
+    if k.get("A", {}).get("pass") is False:
+        return "No new scar found."
+    return "Bare earth by the river."
+
+
 def render(r, path):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib.gridspec import GridSpec
-    from matplotlib.patches import Rectangle
+    from matplotlib.patches import FancyBboxPatch, Rectangle
+    
+    SERIF, BODY, MONO = _register_fonts()
+    fig = plt.figure(figsize=(7.2, 9.6), dpi=150, facecolor=GRAPHITE)
+    fig.subplots_adjust(left=0.0, right=1.0, top=1.0, bottom=0.0)
+    gs = GridSpec(5, 1, figure=fig, height_ratios=[2.65, 2.75, 1.95, 1.35, 0.9], hspace=0.06)
+    fig.add_artist(Rectangle((0, 0), 1, 1, transform=fig.transFigure, fill=False,
+                             edgecolor=LIME, linewidth=4, clip_on=False))
 
-    fig = plt.figure(figsize=(7.2, 9.6), dpi=150, facecolor=CREAM)
-    gs = GridSpec(4, 3, figure=fig, height_ratios=[0.5, 2.2, 1.6, 1.9], hspace=0.28, wspace=0.05,
-                  left=0.05, right=0.95, top=0.97, bottom=0.035)
-    ax = fig.add_subplot(gs[0, :]); ax.axis("off")
-    ax.text(0, 0.78, "TWO EYES · EVIDENCE CARD", fontsize=15.5, weight="bold", va="center", color=FOREST)
-    if r.get("demo"):
-        ax.text(1, 0.78, "DEMO", fontsize=11, weight="bold", va="center", ha="right", color=GOLD)
-    lat, lon = r["bridge"]["lat"], r["bridge"]["lon"]
-    ax.text(0, 0.15, f"{r['bridge'].get('name') or 'Bridge'} (~{round(lat, 2)}, {round(lon, 2)}) · "
-            f"checked {r['date']}", fontsize=8.5, color="#6b6355", va="center")
+    # --- 1. lead satellite panel: rgb_after + lime contour + illustrative boxes ---
+    ax = fig.add_subplot(gs[0]); ax.axis("off")
+    img = (r.get("scar") or {}).get("rgb_after")
+    if img is not None:
+        ax.imshow(img, aspect="auto")
+    else:
+        ax.text(0.5, 0.5, "no image", ha="center", va="center", color=SILT,
+                fontsize=9, transform=ax.transAxes)
     s = r.get("scar") or {}
-    if r.get("status") == "SCAR" and s.get("area_ha"):
-        ax.text(1, 0.15, f"{s['area_ha']:.1f} ha · {s['distance_km']:.0f} km upstream",
-                fontsize=10, weight="bold", va="center", ha="right", color=ORANGE)
-    ax.add_patch(Rectangle((0, 0.42), 1, 0.022, transform=ax.transAxes, facecolor=GOLD,
-                           edgecolor="none", clip_on=False))
+    mask = s.get("mask")
+    if mask is not None and mask.any():
+        ax.contour(mask.astype(float), levels=[0.5], colors=[LIME], linewidths=1.4)
+    boxes = s.get("sam_boxes") or []
+    for box in boxes:
+        l, t, rr, b = box
+        ax.add_patch(Rectangle((l, t), rr - l, b - t, fill=False, edgecolor=LIME, linewidth=1.6))
+    illustrative = bool(r.get("demo") or s.get("boxes_illustrative"))
+    if illustrative and boxes:
+        ax.text(0.03, 0.06, "Illustrative boxes, not SAM output", transform=ax.transAxes,
+                fontsize=7.5, color=LIME, family=MONO, va="bottom",
+                bbox=dict(boxstyle="round,pad=0.45", fc=GRAPHITE, ec=LIME, alpha=0.55))
+    # chip: EVIDENCE CARD
+    ax.text(0.02, 0.97, "EVIDENCE CARD", transform=ax.transAxes, fontsize=9, family=MONO,
+            color=GRAPHITE, va="top", ha="left",
+            bbox=dict(boxstyle="square,pad=0.55", fc=LIME, ec="none"))
+    # demo chip, tucked under the EVIDENCE CARD chip
+    if r.get("demo"):
+        ax.text(0.02, 0.86, "DEMO · ILLUSTRATIVE", transform=ax.transAxes, fontsize=8,
+                family=MONO, color=LIME, va="top", ha="left",
+                bbox=dict(boxstyle="square,pad=0.45", fc="none", ec=LIME, lw=1.2))
+    # Two Eyes mark (left silt pupil, right lime crosshair), from the brand logo lockup
+    mk_ax = ax.inset_axes([0.87, 0.045, 0.115, 0.10])
+    mk_ax.axis("off")
+    mk_ax.set_aspect("equal")
+    mk_ax.set_xlim(0, 3.1); mk_ax.set_ylim(0, 1)
+    from matplotlib.patches import Circle
+    mk_ax.add_patch(Circle((0.45, 0.5), 0.36, fill=False, ec=BONE, lw=2))
+    mk_ax.add_patch(Circle((0.45, 0.5), 0.09, fc=SILT, ec="none"))
+    mk_ax.add_patch(Circle((2.65, 0.5), 0.36, fill=False, ec=LIME, lw=2))
+    mk_ax.add_patch(Circle((2.65, 0.5), 0.09, fc=LIME, ec="none"))
+    for xy1, xy2 in (((2.65, 0.9), (2.65, 1.1)), ((2.15, 0.5), (2.3, 0.5)),
+                     ((2.65, -0.1), (2.65, 0.1)), ((3.0, 0.5), (3.15, 0.5))):
+        mk_ax.plot(*zip(xy1, xy2), color=LIME, lw=1.6, clip_on=False)
+    mk_ax.plot([0.85, 2.25], [0.5, 0.62], color=LIME, lw=1.4)
+
+    # --- 2. headline (Instrument Serif; italic lime emphasis phrase) ---
+    ax = fig.add_subplot(gs[1]); ax.axis("off")
+    h_lines = headline(r)
+    lead_lines = textwrap.wrap(h_lines[0], 46)
+    y = 1.0
+    for line in lead_lines:
+        ax.text(0.02, y, line, fontsize=21, va="top", family=SERIF, color=BONE)
+        y -= 0.20
+    ax.text(0.02, y - 0.03, _emphasis_phrase(r), fontsize=22, family=SERIF,
+            fontstyle="italic", color=LIME, va="top")
+    rest = " ".join(h_lines[1:])
+    if rest:
+        ax.text(0.02, y - 0.20, textwrap.fill(rest, 92), fontsize=10, va="top", family=BODY,
+                color=BONE, linespacing=1.5)
+
+    # --- 3. mono rows: RIVER | LOCATION | COMPARED | FINDING ---
+    ax = fig.add_subplot(gs[2]); ax.axis("off")
+    lat, lon = r["bridge"]["lat"], r["bridge"]["lon"]
+    comp = f"Sentinel-2 · {_period(C.BEFORE)} vs {_period(C.AFTER)}"
+    finding = f"{s['area_ha']:.1f} ha, {s['distance_km']:.0f} km upstream" if s.get("area_ha") else "—"
+    rows = [("RIVER", r["bridge"].get("name") or "Bridge", BONE),
+            ("LOCATION", f"{lat:.4f}, {lon:.4f}", BONE),
+            ("COMPARED", comp, BONE),
+            ("FINDING", finding, LIME)]
     n_refined, muse_quote = _meta_info(r)
-    strip = [f"SAM 3.1 refined {n_refined} scars"] if n_refined else []
-    if muse_quote:
-        strip.append(muse_quote)
-    if strip:
-        ax.text(0, 0.58, "   ·   ".join(strip), fontsize=8.5, weight="bold", color=ORANGE, va="center")
+    rows.append(("CHECKS BY", f"SAM 3.1 refined {n_refined} scars" + (f" · {muse_quote}" if muse_quote else ""), SILT))
+    for i, (k, v, col) in enumerate(rows):
+        y = 0.88 - i * 0.185
+        ax.plot([0.02, 0.98], [y - 0.125, y - 0.125], color=RULE_EDGE_HEX, lw=0.8)
+        ax.text(0.02, y, k, fontsize=8.5, family=MONO, color=SILT, va="center")
+        ax.text(0.30, y, v, fontsize=9.5, family=MONO if col != BONE else BODY, color=col,
+                va="center")
 
-    panels = [("Your clip", r.get("ground", {}).get("still") if r.get("ground") else None, None)]
-    out_method = str(s.get("outline_method", ""))
-    now_title = f"Now ({_period(C.AFTER)})"
-    if "sam" in out_method.lower() or s.get("sam_boxes"):
-        now_title = f"Now · SAM 3.1 ({_period(C.AFTER)})"
-    panels += [(f"Before ({_period(C.BEFORE)})", s.get("rgb_before"), None),
-               (now_title, s.get("rgb_after"), s.get("mask"))]
-    for i, (title, img, mask) in enumerate(panels):
-        a = fig.add_subplot(gs[1, i]); a.set_xticks([]); a.set_yticks([])
-        for sp in a.spines.values():
-            sp.set_color(RULE_EDGE)
-        a.set_title(title, fontsize=8.5, color=FOREST, weight="bold", loc="left")
-        if img is None:
-            a.text(0.5, 0.5, "no clip" if i == 0 else "no image", ha="center", va="center",
-                   color="#b0a892", fontsize=8, transform=a.transAxes)
-            continue
-        a.imshow(img)
-        if i == 0 and (r.get("ground") or {}).get("credit"):
-            a.set_xlabel(textwrap.fill(r["ground"]["credit"], 34), fontsize=5.5, color="#8d8574")
-        if mask is not None and mask.any():
-            a.contour(mask.astype(float), levels=[0.5], colors=[CONTOUR_COLOR], linewidths=1.2)
-        if i == 2:
-            for box in (s.get("sam_boxes") or []):
-                l, t, rr, b = box
-                a.add_patch(Rectangle((l, t), rr - l, b - t, fill=False,
-                                      edgecolor="#ff7a00", linewidth=1.5))
-
-    ax = fig.add_subplot(gs[2, :]); ax.axis("off")
+    # --- 4. A–F checks: lime/silt mono chips ---
+    ax = fig.add_subplot(gs[3]); ax.axis("off")
     for i, (key, name) in enumerate(BADGES):
         v = r["checks"].get(key, {}).get("pass")
         face, sym_col, label_col = _BADGES_STYLE.get(v, _BADGES_STYLE[None])
-        x, y = (i % 3) / 3, 0.75 - (i // 3) * 0.5
-        ax.add_patch(plt.Rectangle((x + 0.005, y - 0.2), 0.32, 0.38, transform=ax.transAxes,
-                                   facecolor=face, edgecolor=GOLD if v else RULE_EDGE, lw=1.4))
-        ax.text(x + 0.03, y, f"{_badge_symbol(v)}  {key}  {name}", fontsize=8.5,
-                color=label_col, weight="bold" if v else "normal",
-                va="center", transform=ax.transAxes)
+        x, y = (i % 2) * 0.5, 0.78 - (i // 2) * 0.42
+        ax.text(x + 0.02, y, f"{_badge_symbol(v)} {key}", fontsize=10,
+                family=[MONO, "DejaVu Sans"],    # fallback: JBMono lacks the ballot glyphs
+                color=sym_col, weight="bold", va="center",
+                bbox=dict(boxstyle="square,pad=0.4", fc=face if face != "none" else "none",
+                          ec=LIME if v else RULE_EDGE_HEX, lw=1.1))
+        ax.text(x + 0.085, y, name, fontsize=9, family=BODY, color=label_col,
+                va="center", alpha=0.85 if v else 0.7)
 
-    ax = fig.add_subplot(gs[3, :]); ax.axis("off")
-    body = "\n\n".join(textwrap.fill(t, 78) for t in headline(r))
-    ax.text(0, 1, body, fontsize=9.5, va="top", linespacing=1.4, color=FOREST)
-    ax.text(0, 0.0, textwrap.fill(
-        "Badges show which independent checks agree; they are not a probability. Sources: Sentinel-2 (ESA/Copernicus), "
-        "SAM 3.1 (Meta), HydroBASINS, RADD (WUR/GFW), Hansen GFC, WRI/Google DeepMind drivers, WDPA, JRC water. "
-        "Location shown to ~1 km. No personal data kept.", 100), fontsize=6, color=MUTED_FOOT, va="bottom")
-    if r.get("scar") or r.get("ground") or r.get("meta"):
-        ax.text(1, 0.155, "Powered by Meta SAM 3.1 + Muse Spark", fontsize=8.5, weight="bold",
-                color=ORANGE, va="bottom", ha="right")
-    fig.add_artist(Rectangle((0, 0), 1, 1, transform=fig.transFigure, fill=False,
-                             edgecolor=GOLD, linewidth=8, clip_on=False))
-    fig.savefig(path, facecolor=CREAM)
+    # --- 5. footer ---
+    ax = fig.add_subplot(gs[4]); ax.axis("off")
+    cop_years = f"{C.BEFORE[0][:4]}, {C.AFTER[0][:4]}"
+    ax.text(0.02, 0.06, textwrap.fill(
+        f"Contains modified Copernicus Sentinel data {cop_years} · checked {r['date']}", 76),
+        fontsize=6.5, family=MONO, color=SILT, va="bottom")
+    ax.text(0.02, 0.42, "Powered by", fontsize=6.5, family=MONO, color=SILT, va="bottom")
+    ax.text(0.13, 0.42, "Meta SAM 3.1 + Muse Spark", fontsize=6.5, family=MONO, color=BONE,
+            va="bottom")
+    pill = FancyBboxPatch((0.66, 0.32), 0.33, 0.2, boxstyle=f"round,pad=0.015,rounding_size=0.012",
+                          transform=ax.transAxes, fc=WA, ec="none", mutation_aspect=9.6 / 7.2)
+    ax.add_patch(pill)
+    ax.text(0.825, 0.42, "Share on WhatsApp", fontsize=6.5, family=BODY, color="#0b2e17",
+            weight="bold", ha="center", va="center")
+    fig.savefig(path, facecolor=GRAPHITE)
     plt.close(fig)
     return path
