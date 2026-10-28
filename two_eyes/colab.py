@@ -7,16 +7,19 @@ import time
 def setup(g=None, project=None):
     import ee
     g = g or {}
-    if not os.environ.get("MODEL_API_KEY"):
+    if not os.environ.get("MODEL_API_KEY") or not os.environ.get("EE_PROJECT"):
         try:
             from google.colab import userdata
-            os.environ["MODEL_API_KEY"] = userdata.get("MODEL_API_KEY")
+            if not os.environ.get("MODEL_API_KEY"):
+                os.environ["MODEL_API_KEY"] = userdata.get("MODEL_API_KEY")
+            if not os.environ.get("EE_PROJECT"):
+                os.environ["EE_PROJECT"] = userdata.get("EE_PROJECT")
         except Exception as ex:
-            print("MODEL_API_KEY not loaded:", type(ex).__name__)
+            print("Colab secrets not loaded:", type(ex).__name__)
     try:
         ee.Number(1).getInfo()
     except Exception:
-        ee.Initialize(project=project or g.get("EE_PROJECT"))
+        ee.Initialize(project=project or os.environ.get("EE_PROJECT") or g.get("EE_PROJECT"))
     print("Earth Engine OK; Meta key loaded:", bool(os.environ.get("MODEL_API_KEY")))
 
 

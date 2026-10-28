@@ -17,7 +17,7 @@ def test_scar_judge_score_recorded():
     d = json.load(open(path))
     assert d["n"] >= 8
     assert 0.0 <= d["hit_rate"] <= 1.0
-    # Honest recorded rate from Muse on Birim chips (Atewa EE unavailable)
+    # Honest recorded rate from Muse on real Atewa EE chips (was Birim 5/8 stand-in)
     assert d["correct"] == int(round(d["hit_rate"] * d["n"]))
 
 

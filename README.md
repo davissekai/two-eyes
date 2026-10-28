@@ -52,9 +52,12 @@ Filming point: N4 trunk-road bridge over the Birim (6.28442, -0.46118), 307 km²
   WRI driver = hard commodities), E – (river too narrow for the JRC water mask), F ✗ (no protected area;
   licence status is a manual check).
 - Ground eye: Muse Spark (recorded Meta run): **"muddy brown"** — "Water is brown with sediment throughout".
-- Muse scar judge (frozen prompt v1): exact-match hit rate **62.5% (5/8)** on Birim NDVI scar chips +
-  forest controls. Atewa EE mining tiles were unavailable on the build box; Muse preferred `unclear`
-  when open-water pits were not resolvable. Verdicts cached for a deterministic demo.
+- Muse scar judge (frozen prompt v1): exact-match hit rate **50% (4/8)** on **real Atewa** Earth Engine
+  Sentinel-2 true-colour chips (CERSGIS-measured clearing components + nearby galamsey-belt scars as
+  mining positives; intact-forest / no-scar windows as `unclear` controls). Replaces the earlier Birim
+  stand-in **5/8 (62.5%)**. Muse preferred `unclear` on the mining positives when open-water pits were
+  not resolvable at 10 m — honest, not over-called. Verdicts cached for a deterministic demo.
+  Lead scar figures (**17.0 ha, ~19 km upstream**) are unchanged (Birim EE catchment).
 - Card text: Muse Spark writes under check-grounded rules (every sentence names a check; code drops
   sentences whose check failed). A minimum card (location, NDVI change, "Likely source, not proven")
   always survives.
@@ -84,7 +87,8 @@ recorded Birim Meta run with no live API calls.
 import os, ee
 from google.colab import userdata
 os.environ["MODEL_API_KEY"] = userdata.get("MODEL_API_KEY")   # Colab Secrets
-ee.Authenticate(); ee.Initialize(project="YOUR-EE-PROJECT")
+os.environ["EE_PROJECT"] = userdata.get("EE_PROJECT")         # never hard-code
+ee.Authenticate(); ee.Initialize(project=os.environ["EE_PROJECT"])
 
 from two_eyes import pipeline
 r = pipeline.run(6.28442, -0.46118, name="Birim, N4 bridge", clip="river.mp4")
