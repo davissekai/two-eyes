@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "two-eyes"
+version = "0.1.0"
+description = "Citizen river clip + Sentinel-2 + SAM 3.1: trace muddy water to new forest scars upstream (Ghana)."
+requires-python = ">=3.9"
+dependencies = ["earthengine-api", "numpy", "scipy", "pyproj", "pillow", "matplotlib", "rasterio",
+                "openai", "meta-sam-parser", "opencv-python-headless"]
+
+[project.optional-dependencies]
+app = ["gradio"]
+dev = ["pytest"]
+
+[tool.setuptools]
+packages = ["two_eyes"]
