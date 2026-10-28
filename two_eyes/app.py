@@ -1,4 +1,4 @@
-"""Web UI (Gradio) in the Field Evidence look: graphite, bone, silt; machine lime accents.
+"""Web UI (Gradio) in Field Evidence LIGHT MODE: bone page, graphite type; machine lime on graphite chips.
 
 Local:   DEMO_MODE=1 python -m two_eyes.app        (offline demo, no API keys needed)
 Colab:   from two_eyes.app import launch; launch(share=True)
@@ -19,22 +19,25 @@ HERO_CREDIT = "Photo: Goldenwabbit, Wikimedia Commons, CC BY-SA 4.0"
 
 ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 
-# Field Evidence tokens (atelier brand kit, direction A)
-BASE = "#15130F"     # graphite
-PANEL = "#1c1914"
-PANEL2 = "#221e18"
-BONE = "#F2EDE4"
-SILT = "#C9A27E"
-LIME = "#D4FF3A"     # machine accent: chips, badges, emphasis only
-WA = "#25D366"       # WhatsApp share button only
+# Field Evidence tokens — LIGHT MODE (atelier brand kit, direction A inverted)
+GRAPHITE = "#15130F"
+BONE = "#F2EDE4"          # page background
+PANEL = "#FAF7F1"         # lighter bone panels
+PANEL2 = "#E8E1D5"        # darker bone panels / wells
+SILT = "#C9A27E"          # rules + borders ONLY (fails WCAG AA as text on bone)
+LATERITE = "#9C5A34"      # secondary text (AA on bone)
+LIME = "#D4FF3A"          # machine accent only: on graphite chips or over imagery
+WA = "#25D366"            # WhatsApp share button only
 
-RULER = "rgba(242,237,228,.18)"
+BASE = BONE               # page = bone
+RULER = "rgba(21,19,15,.20)"   # graphite ~20% field/panel borders
+FIELD_BORDER = "rgba(21,19,15,.20)"
 
 _EYES_MARK = (
     '<svg viewBox="0 0 220 110" width="150" height="75" xmlns="http://www.w3.org/2000/svg" '
     'aria-label="Two Eyes mark">'
-    '<circle cx="55" cy="55" r="44" fill="none" stroke="#F2EDE4" stroke-width="5"/>'
-    '<circle cx="55" cy="55" r="11" fill="#C9A27E"/>'
+    '<circle cx="55" cy="55" r="44" fill="none" stroke="#15130F" stroke-width="5"/>'
+    '<circle cx="55" cy="55" r="11" fill="#9C5A34"/>'
     '<circle cx="165" cy="55" r="44" fill="none" stroke="#D4FF3A" stroke-width="5"/>'
     '<g stroke="#D4FF3A" stroke-width="4">'
     '<line x1="165" y1="3" x2="165" y2="17"/><line x1="165" y1="93" x2="165" y2="107"/>'
@@ -63,63 +66,63 @@ def _font_faces(css):
 
 def build_css():
     css = f"""
-body {{background:{BASE} !important;}}
+body {{background:{BONE} !important;}}
 .gradio-container {{
-  background:{BASE} !important; color:{BONE} !important; max-width:1180px !important;
+  background:{BONE} !important; color:{GRAPHITE} !important; max-width:1180px !important;
   font-family:G,'Geist',Arial,sans-serif !important; padding-bottom:0 !important;
 }}
-.gradio-container h1, .gradio-container h2, .gradio-container h3 {{color:{BONE};}}
-.gradio-container label {{color:{SILT} !important; font-weight:600; background:transparent !important;}}
-.gradio-container label span {{color:{SILT} !important;}}
-.gradio-container .info {{color:{SILT} !important;}}
+.gradio-container h1, .gradio-container h2, .gradio-container h3 {{color:{GRAPHITE};}}
+.gradio-container label {{color:{LATERITE} !important; font-weight:600; background:transparent !important;}}
+.gradio-container label span {{color:{LATERITE} !important;}}
+.gradio-container .info {{color:{LATERITE} !important;}}
 
-/* graphite panels, subtle bone rules */
+/* bone panels, graphite ~20% rules */
 .gradio-container .form, .gradio-container .block {{
   background-color:{PANEL} !important; border-color:{RULER} !important; border-radius:14px !important;
 }}
-/* Graphite fields, Bone border + text — bridge dropdown matches lat/lon inputs */
+/* Bone fields, Graphite text, Graphite~20% border — bridge dropdown matches lat/lon inputs */
 .gradio-container textarea, .gradio-container input, .gradio-container select,
 .gradio-container .wrap input, .gradio-container .wrap .secondary-wrap,
 .gradio-container [data-testid="dropdown"] , .gradio-container [data-testid="dropdown"] input,
 .gradio-container .container > .wrap, .gradio-container .input-container,
 .gradio-container .dropdown-container, .gradio-container .wrap.full {{
-  background:{BASE} !important; color:{BONE} !important; border:1px solid {BONE} !important;
+  background:{PANEL} !important; color:{GRAPHITE} !important; border:1px solid {FIELD_BORDER} !important;
   font-size:15px !important; border-radius:10px !important;
   box-shadow:none !important;
 }}
 .gradio-container textarea::placeholder, .gradio-container input::placeholder {{
-  color:{SILT} !important; opacity:.65;}}
+  color:{LATERITE} !important; opacity:.75;}}
 .gradio-container ul.options, .gradio-container ul[class*='option'],
 .gradio-container [role="listbox"] {{
-  background:{BASE} !important; border:1px solid {BONE} !important; color:{BONE} !important;}}
+  background:{PANEL} !important; border:1px solid {FIELD_BORDER} !important; color:{GRAPHITE} !important;}}
 .gradio-container ul.options li, .gradio-container ul[class*='option'] li,
-.gradio-container [role="option"] {{color:{BONE} !important; background:{BASE} !important;}}
+.gradio-container [role="option"] {{color:{GRAPHITE} !important; background:{PANEL} !important;}}
 .gradio-container ul.options li:hover, .gradio-container ul[class*='option'] li:hover,
 .gradio-container [role="option"]:hover {{
-  background:{PANEL} !important; color:{BONE} !important;}}
-.gradio-container .dropdown-arrow, .gradio-container .icon-wrap {{color:{BONE} !important;}}
+  background:{PANEL2} !important; color:{GRAPHITE} !important;}}
+.gradio-container .dropdown-arrow, .gradio-container .icon-wrap {{color:{GRAPHITE} !important;}}
 #col-controls .wrap, #col-controls input, #col-controls select {{
-  background:{BASE} !important; color:{BONE} !important; border-color:{BONE} !important;}}
+  background:{PANEL} !important; color:{GRAPHITE} !important; border-color:{FIELD_BORDER} !important;}}
 
-/* primary button: bone on graphite, large tap target */
+/* primary button: graphite fill, bone label, large tap target */
 .gradio-container button.primary {{
-  background:{BONE} !important; color:{BASE} !important; border:none !important;
+  background:{GRAPHITE} !important; color:{BONE} !important; border:none !important;
   border-radius:12px !important; font-weight:700 !important; min-height:54px !important;
   font-size:1.06rem !important; letter-spacing:.02em;
 }}
-.gradio-container button.primary:hover {{background:#ffffff !important;}}
+.gradio-container button.primary:hover {{background:#000000 !important;}}
 .gradio-container button.secondary, .gradio-container button:not(.primary) {{
-  background:{PANEL} !important; color:{BONE} !important; border:1px solid {RULER} !important;
+  background:{PANEL} !important; color:{GRAPHITE} !important; border:1px solid {RULER} !important;
   border-radius:10px !important; min-height:42px;
 }}
 
 /* outputs */
 .gradio-container pre, .gradio-container [class*='json'], .gradio-container [class*='json'] * {{
-  background:{PANEL2} !important; color:{BONE} !important;
+  background:{PANEL2} !important; color:{GRAPHITE} !important;
 }}
 .gradio-container img, .gradio-container video {{
   border-radius:14px; border:1px solid {RULER};}}
-.gradio-container .status {{color:{LIME} !important;}}
+.gradio-container .status {{color:{LATERITE} !important;}}
 .gradio-container textarea {{min-height:88px;}}
 
 /* hero */
@@ -128,33 +131,34 @@ body {{background:{BASE} !important;}}
 .hero-mark {{margin-bottom:6px;}}
 .hero h1 {{font-family:IS,'Instrument Serif',serif; font-weight:400;
           font-size:clamp(58px,9vw,108px); line-height:.92; letter-spacing:-.02em;
-          margin:10px 0 14px; color:{BONE};}}
+          margin:10px 0 14px; color:{GRAPHITE};}}
 .hero .tagline {{font-family:IS,'Instrument Serif',serif; font-size:clamp(19px,2.6vw,28px);
-                font-weight:400; color:{BONE};}}
-.hero .tagline i {{color:{LIME}; font-style:italic;}}
-.sub {{font-size:clamp(15px,2vw,19px); font-weight:500; line-height:1.45; color:{BONE}; margin-top:14px;}}
-.small {{font-size:clamp(13px,1.7vw,15px); line-height:1.55; margin-top:10px; color:{SILT};}}
+                font-weight:400; color:{GRAPHITE};}}
+.hero .tagline i {{color:{LATERITE}; font-style:italic;}}
+.sub {{font-size:clamp(15px,2vw,19px); font-weight:500; line-height:1.45; color:{GRAPHITE}; margin-top:14px;}}
+.small {{font-size:clamp(13px,1.7vw,15px); line-height:1.55; margin-top:10px; color:{LATERITE};}}
 .hero-img {{width:100%; border-radius:16px; border:1px solid {RULER}; display:block;}}
 .hero-cap {{font-family:JB,'JetBrains Mono',monospace; letter-spacing:.04em; font-size:11px;
-           color:{SILT}; margin-top:8px; text-align:center; opacity:.85;}}
+           color:{LATERITE}; margin-top:8px; text-align:center; opacity:.9;}}
 
-/* machine-lime meta chips (mono, uppercase, tracking) */
+/* machine chips: graphite fill + lime text (lime never sits on bone as text) */
 .chip-row {{margin-top:10px;}}
-.chip {{display:inline-block;border:1.5px solid {LIME};color:{LIME};
+.chip {{display:inline-block;border:1.5px solid {GRAPHITE};color:{LIME};
        font-family:JB,'JetBrains Mono',monospace;font-weight:500;
        text-transform:uppercase;letter-spacing:.08em;
        border-radius:99px;padding:6px 13px;font-size:12px;margin:0 10px 10px 0;
-       background:rgba(21,19,15,.55);}}
+       background:{GRAPHITE};}}
 
-/* demo banner: graphite panel with lime rule */
-#demo-banner {{border:1.5px solid {LIME}; color:{BONE}; border-radius:12px;
+/* demo banner: panel with graphite~20% rule; DEMO chip is graphite+lime */
+#demo-banner {{border:1.5px solid {RULER}; color:{GRAPHITE}; border-radius:12px;
               padding:12px 16px; font-size:14px; line-height:1.5; background:{PANEL};}}
-#demo-banner .mono {{font-family:JB,'JetBrains Mono',monospace; letter-spacing:.08em;
-                    text-transform:uppercase; color:{LIME};}}
+#demo-banner .mono {{display:inline-block; font-family:JB,'JetBrains Mono',monospace;
+                    letter-spacing:.08em; text-transform:uppercase; color:{LIME};
+                    background:{GRAPHITE}; padding:4px 10px; border-radius:6px; margin-bottom:6px;}}
 
 /* footer note */
 #footnote {{border-top:1px solid {RULER}; margin-top:30px; padding:18px 4px 26px;
-           font-size:12.5px; line-height:1.55; color:{SILT};}}
+           font-size:12.5px; line-height:1.55; color:{LATERITE};}}
 
 /* mobile-first: stack the columns on small screens (e.g. 390px phones) */
 @media (max-width:760px) {{
@@ -203,13 +207,13 @@ def _run(bridge, lat, lon, clip):
 
 
 def _share_html(wa_url):
-    """Two big tap targets: WhatsApp green share, lime-outline download (mobile-first)."""
+    """Two big tap targets: WhatsApp green share (graphite label), graphite+lime download chip."""
     if not wa_url:
         return ""
     style = ("display:inline-flex;align-items:center;gap:8px;padding:14px 22px;border-radius:12px;"
              "font-weight:700;font-size:1.02rem;margin:8px 10px 8px 0;")
-    wa_style = f"{style}background:{WA};color:#0b2e17;border:none;text-decoration:none;"
-    dl_style = f"{style}background:transparent;color:{LIME};border:1.5px solid {LIME};"
+    wa_style = f"{style}background:{WA};color:{GRAPHITE};border:none;text-decoration:none;"
+    dl_style = f"{style}background:{GRAPHITE};color:{LIME};border:1.5px solid {GRAPHITE};"
     return (f'<div class="share-row">'
             f'<a href="{wa_url}" target="_blank" rel="noopener" '
             f'style="{wa_style}">Share on WhatsApp</a>'

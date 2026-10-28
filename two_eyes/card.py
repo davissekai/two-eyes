@@ -1,7 +1,8 @@
 """Evidence card: badges (never percentages), honest headline, PNG for WhatsApp.
 
-Field Evidence look (atelier brand kit, direction A): graphite card, bone type,
-silt labels, laterite accents, machine-lime scar outlines only; WhatsApp share lives in the UI, not the PNG.
+Field Evidence LIGHT MODE (atelier brand kit): bone card, graphite type,
+laterite secondary, silt rules only, machine-lime scar outlines + chips on graphite;
+WhatsApp share lives in the UI, not the PNG.
 """
 import datetime as dt
 import os
@@ -14,24 +15,25 @@ from . import config as C
 BADGES = [("A", "New forest scar"), ("B", "Drains to this bridge"), ("C", "Alerts agree"),
           ("D", "Looks like mining"), ("E", "River muddier below"), ("F", "Inside a protected area")]
 
-# --- Field Evidence palette ---
+# --- Field Evidence palette (LIGHT MODE card) ---
 GRAPHITE = "#15130F"
-BONE = "#F2EDE4"
-SILT = "#C9A27E"
-LATERITE = "#9C5A34"
-LIME = "#D4FF3A"          # machine accent: masks, boxes, badges, finding
-WA = "#25D366"            # WhatsApp share pill only
+BONE = "#F2EDE4"          # card background
+SILT = "#C9A27E"          # rules / borders ONLY (fails AA as text on bone)
+LATERITE = "#9C5A34"      # secondary text (AA on bone)
+LIME = "#D4FF3A"          # machine accent: on graphite chips or over imagery
+WA = "#25D366"            # WhatsApp share pill only (UI, not PNG)
 CONTOUR_COLOR = LIME      # mask contours / scar boxes are machine vision -> lime
-RULE_EDGE = "rgba(242,237,228,.18)"
-RULE_EDGE_HEX = "#4a443b"   # matplotlib spines need an opaque colour
+RULE_EDGE = "rgba(21,19,15,.20)"   # graphite ~20%
+RULE_EDGE_HEX = "#C5C1B9"          # opaque mix of graphite 20% on bone (matplotlib)
 
 FONTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "fonts")
 
 # badge styles: value -> (facecolour, symbol colour, label colour)
+# pass: graphite chip + lime symbol (lime never as text on bone); fail/unknown: laterite muted
 _BADGES_STYLE = {
-    True: (LIME, GRAPHITE, BONE),                    # pass: lime chip, bone label
-    False: ("none", SILT, SILT),                     # fail: silt, muted
-    None: ("none", SILT, SILT),                      # unknown: silt dash
+    True: (GRAPHITE, LIME, GRAPHITE),               # pass: graphite chip, lime mark, graphite label
+    False: ("none", LATERITE, LATERITE),            # fail: laterite muted
+    None: ("none", LATERITE, LATERITE),             # unknown: laterite dash
 }
 
 
@@ -140,7 +142,7 @@ def _register_fonts():
 
 
 def _emphasis_phrase(r):
-    """Short italic lime phrase for the headline, from the checks (demo run: mining digs)."""
+    """Short italic laterite phrase for the headline, from the checks (demo run: mining digs)."""
     k = r["checks"]
     if k.get("D", {}).get("pass"):
         return "Signs of mining upstream."
@@ -175,7 +177,7 @@ def render(r, path):
     from matplotlib.patches import Rectangle
     
     SERIF, BODY, MONO = _register_fonts()
-    fig = plt.figure(figsize=(7.2, 9.6), dpi=150, facecolor=GRAPHITE)
+    fig = plt.figure(figsize=(7.2, 9.6), dpi=150, facecolor=BONE)
     fig.subplots_adjust(left=0.0, right=1.0, top=1.0, bottom=0.0)
     gs = GridSpec(5, 1, figure=fig, height_ratios=[2.65, 2.75, 1.95, 1.35, 0.9], hspace=0.06)
     # No lime border around the whole card (chrome lives in the UI, not the PNG).
@@ -188,33 +190,34 @@ def render(r, path):
     if img is not None:
         ax.imshow(_sat_tile(img, mask, darken=0.85), aspect="auto")
     else:
-        ax.text(0.5, 0.5, "no image", ha="center", va="center", color=SILT,
+        ax.text(0.5, 0.5, "no image", ha="center", va="center", color=LATERITE,
                 fontsize=9, transform=ax.transAxes)
     if mask is not None and mask.any():
         # ~2px at 150 dpi: linewidth_pt = 2 * 72 / 150 ≈ 0.96
         ax.contour(mask.astype(float), levels=[0.5], colors=[LIME], linewidths=1.0)
     illustrative = bool(r.get("demo") or s.get("boxes_illustrative"))
     if illustrative and mask is not None and mask.any():
+        # graphite chip + lime text (machine tag over imagery)
         ax.text(0.03, 0.06, "Illustrative outlines, not live SAM", transform=ax.transAxes,
                 fontsize=7.5, color=LIME, family=MONO, va="bottom",
-                bbox=dict(boxstyle="round,pad=0.45", fc=GRAPHITE, ec=LIME, alpha=0.55))
-    # chip: EVIDENCE CARD
+                bbox=dict(boxstyle="round,pad=0.45", fc=GRAPHITE, ec="none", alpha=0.92))
+    # chip: EVIDENCE CARD — lime fill + graphite text (allowed: lime fill with graphite text)
     ax.text(0.02, 0.97, "EVIDENCE CARD", transform=ax.transAxes, fontsize=9, family=MONO,
             color=GRAPHITE, va="top", ha="left",
             bbox=dict(boxstyle="square,pad=0.55", fc=LIME, ec="none"))
-    # demo chip, tucked under the EVIDENCE CARD chip
+    # DEMO chip: graphite fill + lime text
     if r.get("demo"):
         ax.text(0.02, 0.86, "DEMO · ILLUSTRATIVE", transform=ax.transAxes, fontsize=8,
                 family=MONO, color=LIME, va="top", ha="left",
-                bbox=dict(boxstyle="square,pad=0.45", fc="none", ec=LIME, lw=1.2))
-    # Two Eyes mark (left silt pupil, right lime crosshair), from the brand logo lockup
+                bbox=dict(boxstyle="square,pad=0.45", fc=GRAPHITE, ec="none"))
+    # Two Eyes mark over imagery (left bone ring / laterite pupil, right lime crosshair)
     mk_ax = ax.inset_axes([0.87, 0.045, 0.115, 0.10])
     mk_ax.axis("off")
     mk_ax.set_aspect("equal")
     mk_ax.set_xlim(0, 3.1); mk_ax.set_ylim(0, 1)
     from matplotlib.patches import Circle
     mk_ax.add_patch(Circle((0.45, 0.5), 0.36, fill=False, ec=BONE, lw=2))
-    mk_ax.add_patch(Circle((0.45, 0.5), 0.09, fc=SILT, ec="none"))
+    mk_ax.add_patch(Circle((0.45, 0.5), 0.09, fc=LATERITE, ec="none"))
     mk_ax.add_patch(Circle((2.65, 0.5), 0.36, fill=False, ec=LIME, lw=2))
     mk_ax.add_patch(Circle((2.65, 0.5), 0.09, fc=LIME, ec="none"))
     for xy1, xy2 in (((2.65, 0.9), (2.65, 1.1)), ((2.15, 0.5), (2.3, 0.5)),
@@ -222,47 +225,49 @@ def render(r, path):
         mk_ax.plot(*zip(xy1, xy2), color=LIME, lw=1.6, clip_on=False)
     mk_ax.plot([0.85, 2.25], [0.5, 0.62], color=LIME, lw=1.4)
 
-    # --- 2. headline (Instrument Serif ~1.05 lh) + one small Geist silt subline ---
+    # --- 2. headline (Instrument Serif ~1.05 lh) + Geist laterite subline ---
     ax = fig.add_subplot(gs[1]); ax.axis("off")
     h_lines = headline(r)
     lead = h_lines[0] if h_lines else ""
     lead_lines = textwrap.wrap(lead, 42)
     y = 0.98
     for line in lead_lines:
-        ax.text(0.02, y, line, fontsize=22, va="top", family=SERIF, color=BONE,
+        ax.text(0.02, y, line, fontsize=22, va="top", family=SERIF, color=GRAPHITE,
                 linespacing=1.05)
         y -= 0.22 * 1.05
     sub = h_lines[1] if len(h_lines) > 1 else ""
-    # Prefer the silt meta line when present (demo: since early 2023 · 17.0 ha · …)
+    # Prefer the laterite meta line when present (demo: since early 2023 · 17.0 ha · …)
     if sub and ("·" in sub or "our check only" in sub.lower() or sub.startswith("since ")):
-        ax.text(0.02, y - 0.02, sub, fontsize=10, va="top", family=BODY, color=SILT)
+        ax.text(0.02, y - 0.02, sub, fontsize=10, va="top", family=BODY, color=LATERITE)
         y -= 0.16
         rest = " ".join(h_lines[2:])
     else:
         rest = " ".join(h_lines[1:])
     if rest:
         ax.text(0.02, y - 0.04, textwrap.fill(rest, 92), fontsize=10, va="top", family=BODY,
-                color=BONE, linespacing=1.45)
+                color=GRAPHITE, linespacing=1.45)
 
     # --- 3. mono rows: RIVER | LOCATION | COMPARED | FINDING ---
+    # FINDING is machine data but lime-on-bone fails AA — graphite value; lime reserved for chips/outlines
     ax = fig.add_subplot(gs[2]); ax.axis("off")
     lat, lon = r["bridge"]["lat"], r["bridge"]["lon"]
     comp = f"Sentinel-2 · {_period(C.BEFORE)} vs {_period(C.AFTER)}"
     finding = f"{s['area_ha']:.1f} ha, {s['distance_km']:.0f} km upstream" if s.get("area_ha") else "—"
-    rows = [("RIVER", r["bridge"].get("name") or "Bridge", BONE),
-            ("LOCATION", f"{lat:.4f}, {lon:.4f}", BONE),
-            ("COMPARED", comp, BONE),
-            ("FINDING", finding, LIME)]
+    rows = [("RIVER", r["bridge"].get("name") or "Bridge", GRAPHITE),
+            ("LOCATION", f"{lat:.4f}, {lon:.4f}", GRAPHITE),
+            ("COMPARED", comp, GRAPHITE),
+            ("FINDING", finding, GRAPHITE)]
     n_refined, muse_quote = _meta_info(r)
-    rows.append(("CHECKS BY", f"SAM 3.1 refined {n_refined} scars" + (f" · {muse_quote}" if muse_quote else ""), SILT))
+    rows.append(("CHECKS BY", f"SAM 3.1 refined {n_refined} scars" + (f" · {muse_quote}" if muse_quote else ""), LATERITE))
     for i, (k, v, col) in enumerate(rows):
         y = 0.88 - i * 0.185
         ax.plot([0.02, 0.98], [y - 0.125, y - 0.125], color=RULE_EDGE_HEX, lw=0.8)
-        ax.text(0.02, y, k, fontsize=8.5, family=MONO, color=SILT, va="center")
-        ax.text(0.30, y, v, fontsize=9.5, family=MONO if col != BONE else BODY, color=col,
+        ax.text(0.02, y, k, fontsize=8.5, family=MONO, color=LATERITE, va="center")
+        ax.text(0.30, y, v, fontsize=9.5,
+                family=MONO if k in ("FINDING", "CHECKS BY", "LOCATION") else BODY, color=col,
                 va="center")
 
-    # --- 4. A–F checks: lime/silt mono chips ---
+    # --- 4. A–F checks: graphite+lime pass chips; laterite fail ---
     ax = fig.add_subplot(gs[3]); ax.axis("off")
     for i, (key, name) in enumerate(BADGES):
         v = r["checks"].get(key, {}).get("pass")
@@ -272,19 +277,19 @@ def render(r, path):
                 family=[MONO, "DejaVu Sans"],    # fallback: JBMono lacks the ballot glyphs
                 color=sym_col, weight="bold", va="center",
                 bbox=dict(boxstyle="square,pad=0.4", fc=face if face != "none" else "none",
-                          ec=LIME if v else RULE_EDGE_HEX, lw=1.1))
+                          ec=GRAPHITE if v else RULE_EDGE_HEX, lw=1.1))
         ax.text(x + 0.085, y, name, fontsize=9, family=BODY, color=label_col,
-                va="center", alpha=0.85 if v else 0.7)
+                va="center", alpha=0.95 if v else 0.75)
 
     # --- 5. footer (Share on WhatsApp stays in the Gradio UI only — not on the PNG) ---
     ax = fig.add_subplot(gs[4]); ax.axis("off")
     cop_years = f"{C.BEFORE[0][:4]}, {C.AFTER[0][:4]}"
     ax.text(0.02, 0.18, textwrap.fill(
         f"Contains modified Copernicus Sentinel data {cop_years} · checked {r['date']}", 76),
-        fontsize=6.5, family=MONO, color=SILT, va="bottom")
-    ax.text(0.02, 0.55, "Powered by", fontsize=6.5, family=MONO, color=SILT, va="bottom")
-    ax.text(0.13, 0.55, "Meta SAM 3.1 + Muse Spark", fontsize=6.5, family=MONO, color=BONE,
+        fontsize=6.5, family=MONO, color=LATERITE, va="bottom")
+    ax.text(0.02, 0.55, "Powered by", fontsize=6.5, family=MONO, color=LATERITE, va="bottom")
+    ax.text(0.13, 0.55, "Meta SAM 3.1 + Muse Spark", fontsize=6.5, family=MONO, color=GRAPHITE,
             va="bottom")
-    fig.savefig(path, facecolor=GRAPHITE)
+    fig.savefig(path, facecolor=BONE)
     plt.close(fig)
     return path
