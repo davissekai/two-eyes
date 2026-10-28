@@ -5,7 +5,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from two_eyes import card, checks, ground, sky, trace  # noqa: E402
+from two_eyes import card, checks, demo, ground, sky, trace  # noqa: E402
 from two_eyes import config as C  # noqa: E402
 from two_eyes import pipeline  # noqa: E402
 
@@ -112,6 +112,7 @@ def test_frozen_cutoffs_unchanged():
 
 def test_run_uses_cache_and_reports_timings(tmp_path, monkeypatch):
     calls = []
+    monkeypatch.setattr(demo, "is_demo_mode", lambda: False)   # force the live (caching) path
 
     def fake_sky(lat, lon, focus=None, use_sam=True, log=print, timings=None):
         calls.append(1)

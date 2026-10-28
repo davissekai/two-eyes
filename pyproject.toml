@@ -16,3 +16,6 @@ dev = ["pytest"]
 
 [tool.setuptools]
 packages = ["two_eyes"]
+
+[tool.setuptools.package-data]
+two_eyes = ["assets/*"]

@@ -71,4 +71,4 @@ MUDDY_B = 18.0
 CLEAR_B = 8.0
 GLARE_L = 85.0               # median L* above this: overexposed, colour not judged
 
-SHARE_LLM = False            # WhatsApp text from the fixed template (fast, no wording drift); True = Muse Spark rewrite
+SHARE_LLM = True             # WhatsApp text rewritten by Muse Spark when a key is set; template fallback otherwise

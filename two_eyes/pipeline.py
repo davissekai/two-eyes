@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 
 from . import config as C
-from . import card, checks, sky
+from . import card, checks, demo, sky
 from .trace import Basins, check_b
 
 
@@ -143,6 +143,9 @@ def run(bridge_lat, bridge_lon, name=None, clip=None, clip_credit=None, focus=No
     The satellite part depends only on the place and the fixed dates, so it is cached on disk; the
     citizen's clip is always analysed fresh, in parallel with the satellite work.
     """
+    if demo.is_demo_mode():
+        return demo.run(bridge_lat, bridge_lon, name=name, clip=clip, clip_credit=clip_credit,
+                        out_dir=out_dir, log=log)
     t0 = time.time()
     os.makedirs(out_dir, exist_ok=True)
     timings = {}
@@ -203,11 +206,18 @@ def run(bridge_lat, bridge_lon, name=None, clip=None, clip_credit=None, focus=No
 
 
 def warm(bridges, log=print):
-    """Pre-compute the satellite part for demo bridges so live runs only wait for the clip."""
+    """Pre-compute the satellite part for demo bridges so live runs only wait for the clip.
+    No-op in demo mode (when Earth Engine is not available, for example)."""
+    if demo.is_demo_mode():
+        log("Warm skipped: demo mode (no Earth Engine or Meta API calls).")
+        return
     for lat, lon in bridges:
-        t = time.time()
-        run(lat, lon, use_llm=False, log=lambda *a: None)
-        log(f"warmed {lat}, {lon} in {time.time() - t:.0f}s")
+        try:
+            t = time.time()
+            run(lat, lon, use_llm=False, log=lambda *a: None)
+            log(f"warmed {lat}, {lon} in {time.time() - t:.0f}s")
+        except Exception as ex:
+            log(f"warm skipped {lat}, {lon}: {type(ex).__name__}: {ex}")
 
 
 def _json_default(o):
