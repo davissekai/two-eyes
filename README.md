@@ -8,7 +8,7 @@ against independent datasets, and returns a dated, anonymous evidence card you c
 
 Built for the Meta Global AI Developer Hackathon (Oct 26 – Nov 5, 2026). Uses **SAM 3.1** (box prompts on
 satellite tiles, concept prompt on the citizen's video) and **Muse Spark** (image understanding: judges the
-water colour in the clip; optional plain-English rewrite of the share text) on Meta Model API.
+water colour in the clip; check-grounded evidence-card text; scar-cause second opinion) on Meta Model API.
 
 ## How it works
 
@@ -45,11 +45,23 @@ NDVI-first with SAM 3.1 box refinement. The packaged pipeline reruns this gate (
 
 Filming point: N4 trunk-road bridge over the Birim (6.28442, -0.46118), 307 km² of catchment searched.
 
-- 24 NDVI candidates, 8 refined with SAM 3.1. Lead scar: **17.0 ha, about 19 km upstream**, NDVI 0.71 → 0.17.
+- 24 NDVI candidates, **9 refined with SAM 3.1** (recorded Meta Model API run, 28 Oct 2026; was 8 in the
+  earlier illustrative demo). Lead scar: **17.0 ha, about 19 km upstream** (Earth Engine catchment
+  numbers; visual-tile px are not hectares), NDVI 0.71 → 0.17.
 - Checks: A ✓, B ✓, C – (outside the RADD forest baseline; Hansen ends 2025), D ✓ (open-water pits,
   WRI driver = hard commodities), E – (river too narrow for the JRC water mask), F ✗ (no protected area;
   licence status is a manual check).
-- Ground eye: SAM 3.1 tracked the water in every frame; Muse Spark: "muddy brown".
+- Ground eye: Muse Spark (recorded Meta run): **"muddy brown"** — "Water is brown with sediment throughout".
+- Muse scar judge (frozen prompt v1): exact-match hit rate **62.5% (5/8)** on Birim NDVI scar chips +
+  forest controls. Atewa EE mining tiles were unavailable on the build box; Muse preferred `unclear`
+  when open-water pits were not resolvable. Verdicts cached for a deterministic demo.
+- Card text: Muse Spark writes under check-grounded rules (every sentence names a check; code drops
+  sentences whose check failed). A minimum card (location, NDVI change, "Likely source, not proven")
+  always survives.
+- Privacy: uploaded clips are SAM 3.1 concept-prompted for `face` then `license plate` and blurred
+  before storage/share; detection errors fail closed (clip does not ship unblurred).
+- Meta API calls for the recorded Birim SAM + Muse colour + scar-judge score: see `birim_meta.json`
+  and the local disk cache under `~/.two_eyes_cache/meta` (never re-called on a cache hit).
 - Speed: about 80 s for a new place; satellite results are cached per place (fixed dates), so a repeat
   or pre-warmed bridge takes about 16 s, all of it the clip.
 
@@ -57,6 +69,13 @@ Filming point: N4 trunk-road bridge over the Birim (6.28442, -0.46118), 307 km²
 ["Pra River Ghana.jpg"](https://commons.wikimedia.org/wiki/File:Pra_River_Ghana.jpg) (Pra River from the
 Beposo bridge, 2014), Wikimedia Commons, licensed **CC BY-SA 3.0**. It was not filmed at the N4 Birim bridge,
 and it is credited on every evidence card it appears on. The clip file itself is not included in this repo.
+
+### Meta Model API
+
+Base URL `https://api.meta.ai/v1` (OpenAI-SDK compatible). Models: `sam-3.1`, `muse-spark-1.3`.
+Load `MODEL_API_KEY` from `~/.secrets/MODEL_API_KEY` at runtime (never print, log, or commit). Every
+response is cached to disk; a cache hit never re-calls Meta. Demo mode (`DEMO_MODE=1`) serves the
+recorded Birim Meta run with no live API calls.
 
 ## Run it (Google Colab)
 
@@ -79,7 +98,8 @@ Tests: `pytest tests` (pure-Python parts; no Earth Engine needed).
 ## Safety
 
 Film only from public places, never at mining sites. Clips are re-encoded with metadata (GPS) stripped,
-locations on the card are rounded to about 1 km, and nothing personal is stored.
+faces and license plates are blurred with SAM 3.1 before anything is stored or shared (fail closed on
+detection errors), locations on the card are rounded to about 1 km, and nothing personal is stored.
 
 ## Data and licences
 

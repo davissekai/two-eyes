@@ -1,0 +1,88 @@
+{
+  "date": "2026-10-28",
+  "bridge": {
+    "name": "Birim, N4 bridge",
+    "lat": 6.28442,
+    "lon": -0.46118
+  },
+  "sam_ok": true,
+  "sam_usable": true,
+  "sam_err": null,
+  "outline_method": "SAM 3.1 box prompts (recorded Meta run)",
+  "sam_refined": 9,
+  "sam_boxes": [
+    [
+      316,
+      0,
+      375,
+      64
+    ],
+    [
+      437,
+      0,
+      449,
+      14
+    ],
+    [
+      429,
+      0,
+      478,
+      38
+    ],
+    [
+      218,
+      34,
+      242,
+      69
+    ],
+    [
+      188,
+      75,
+      229,
+      109
+    ],
+    [
+      141,
+      79,
+      175,
+      111
+    ],
+    [
+      107,
+      86,
+      143,
+      113
+    ],
+    [
+      118,
+      144,
+      151,
+      170
+    ],
+    [
+      0,
+      179,
+      30,
+      212
+    ]
+  ],
+  "refined_px": 9168,
+  "final_px": 4915,
+  "area_ha_proxy": 49.15,
+  "area_ha_readme": 49.1,
+  "distance_km": 19.0,
+  "ndvi_before": 0.71,
+  "ndvi_after": 0.17,
+  "muse": {
+    "label": "muddy brown",
+    "muddy": true,
+    "reason": "Water is brown with sediment throughout",
+    "label_source": "Muse Spark (image understanding); recorded Meta run"
+  },
+  "api_calls_total": 2,
+  "note": "EE unavailable on this box; SAM/Muse ran on bundled Birim Sentinel tiles (yellow paint neutralized).",
+  "scar_judge_hit_rate": 0.625,
+  "scar_judge_n": 8,
+  "api_calls_total_session": 18,
+  "api_calls_birim_sam_muse": 2
+}

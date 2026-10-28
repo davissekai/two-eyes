@@ -1,0 +1,72 @@
+{
+  "n": 8,
+  "correct": 5,
+  "hit_rate": 0.625,
+  "rows": [
+    {
+      "scar_id": "mine_ndvi_0",
+      "label": "mining pits",
+      "pred": "cloud artefact",
+      "confidence": "medium",
+      "evidence": "Diffuse yellow-white blotches with soft fuzzy edges obscure the forest.",
+      "ok": false
+    },
+    {
+      "scar_id": "mine_ndvi_1",
+      "label": "mining pits",
+      "pred": "mining pits",
+      "confidence": "high",
+      "evidence": "Irregular bright yellow bare dug earth with dark pits replacing forest.",
+      "ok": true
+    },
+    {
+      "scar_id": "mine_ndvi_2",
+      "label": "mining pits",
+      "pred": "unclear",
+      "confidence": "low",
+      "evidence": "After image shows large diffuse yellow patches without clear pits, roads or buildings.",
+      "ok": false
+    },
+    {
+      "scar_id": "mine_ndvi_3",
+      "label": "mining pits",
+      "pred": "unclear",
+      "confidence": "low",
+      "evidence": "Large irregular bright-yellow patches cover forest without visible pits, roads, or structures.",
+      "ok": false
+    },
+    {
+      "scar_id": "ctrl_ndvi_0",
+      "label": "unclear",
+      "pred": "unclear",
+      "confidence": "low",
+      "evidence": "Expanded irregular yellow-brown clearing without clearly resolvable pits or fields.",
+      "ok": true
+    },
+    {
+      "scar_id": "ctrl_ndvi_1",
+      "label": "unclear",
+      "pred": "unclear",
+      "confidence": "low",
+      "evidence": "Irregular tan patches appear but pits and water are not distinct.",
+      "ok": true
+    },
+    {
+      "scar_id": "ctrl_ndvi_2",
+      "label": "unclear",
+      "pred": "unclear",
+      "confidence": "low",
+      "evidence": "scattered tan patches lack distinct water pits, field shapes or settlement structure",
+      "ok": true
+    },
+    {
+      "scar_id": "ctrl_ndvi_3",
+      "label": "unclear",
+      "pred": "unclear",
+      "confidence": "low",
+      "evidence": "Scattered tan patches appear without clear pits water fields or structures.",
+      "ok": true
+    }
+  ],
+  "note": "Atewa EE tiles unavailable on this box. Positives = 4 largest Birim NDVI scar components (galamsey context on painted Sentinel still). Controls = forest corners with no clearing. Exact-match scoring; unclear is a valid answer."
+}

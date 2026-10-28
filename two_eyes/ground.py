@@ -69,25 +69,19 @@ def muddiness(frames, masks):
 
 def judge_colour(frame, mask=None):
     """Ask Muse Spark (image understanding) what the river water looks like. Returns dict or None.
-    With a mask, only the water crop is sent; without one, the whole frame (lets it run alongside SAM)."""
-    import base64, io, json
-    from PIL import Image
-    from .sam import client
+    Cached via muse.respond — never re-calls Meta on a cache hit.
+    With a mask, only the water crop is sent; without one, the whole frame."""
+    from . import muse
     if mask is not None and mask.sum() > 200:
         rr, cc = np.nonzero(mask)
         crop = frame[rr.min():rr.max() + 1, cc.min():cc.max() + 1]
     else:
         crop = frame
-    buf = io.BytesIO(); Image.fromarray(crop).save(buf, format="JPEG", quality=85)
-    url = "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
     q = ('This is a river seen from a bridge. Looking only at the river water, is it muddy (brown/orange sediment), clear, or '
          'impossible to judge (glare, darkness)? Answer only JSON: {"water": "muddy|clear|cannot_tell", '
          '"reason": "<12 words>"}')
-    resp = client().responses.create(model=C.TEXT_MODEL, input=[{"type": "message", "role": "user", "content": [
-        {"type": "input_text", "text": q}, {"type": "input_image", "image_url": url}]}])
-    t = resp.output_text.strip()
-    t = t[t.find("{"): t.rfind("}") + 1]
-    d = json.loads(t)
+    text = muse.respond(q, images=[crop], schema_name="water_colour", cache_tag="water_colour_v1")
+    d = muse.parse_json(text)
     lab = {"muddy": "muddy brown", "clear": "clear", "cannot_tell": "hard to judge"}.get(d.get("water"))
     if not lab:
         return None
@@ -101,17 +95,25 @@ def overlay(frame, mask, color=(255, 120, 0), alpha=0.45):
     return out.astype(np.uint8)
 
 
-def analyse_clip(src, use_sam=True, use_vlm=True):
+def analyse_clip(src, use_sam=True, use_vlm=True, privacy_blur=True):
+    """Prepare clip, privacy-blur faces/plates (fail closed), then SAM water + Muse colour on one still.
+
+    Muse water colour runs on a single still only (no whole-clip Muse) to keep Meta calls minimal.
+    """
     mp4 = prepare_clip(src)
+    if privacy_blur:
+        from . import privacy
+        # Fail closed: PrivacyBlurError propagates — caller must not share the unblurred clip.
+        mp4 = privacy.blur_clip(mp4)
     frames = read_frames(mp4)
     if not frames:
         raise ValueError("Could not read any frames from the clip.")
     h, w = frames[0].shape[:2]
     masks, method = {}, "SAM 3.1 (video, concept prompt '%s')" % C.WATER_PROMPT
-    # SAM (video) and Muse Spark (one still) run at the same time; neither waits for the other.
     from concurrent.futures import ThreadPoolExecutor
     mid = frames[len(frames) // 2]
     with ThreadPoolExecutor(max_workers=2) as ex:
+        # Single-still Muse colour only (skip whole-clip Muse water colour — extra cost).
         vfut = ex.submit(judge_colour, mid) if use_vlm else None
         if use_sam:
             from . import sam
@@ -126,6 +128,6 @@ def analyse_clip(src, use_sam=True, use_vlm=True):
                 res["vlm_error"] = type(e).__name__
     best = max(masks, key=lambda k: masks[k].sum()) if masks else len(frames) // 2
     best = min(best, len(frames) - 1)
-    res.update(method=method, n_frames=len(frames),
+    res.update(method=method, n_frames=len(frames), privacy_blurred=bool(privacy_blur),
                still=overlay(frames[best], masks[best]) if best in masks else frames[best])
     return res
