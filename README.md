@@ -15,12 +15,12 @@ water colour in the clip; optional plain-English rewrite of the share text) on M
 | Check | Question | Method / data |
 |---|---|---|
 | A | Is there a new scar upstream? | Sentinel-2 SR, SCL + Cloud Score+ mask; NDVI-first candidates; SAM 3.1 box prompts refine outlines |
-| B | Does it drain to this spot? | HydroBASINS level 12, `NEXT_DOWN` walk |
+| B | Does it drain to this spot? | Spot snapped onto HydroRIVERS (flags confluences), then HydroBASINS level 12, `NEXT_DOWN` walk |
 | C | Do outside alerts agree? | RADD radar alerts (WUR / Global Forest Watch), Hansen GFC v1.13 |
 | D | Does it look like mining? | Open-water pits inside the scar (MNDWI), WRI/Google DeepMind drivers v1.3 |
 | E | Is the river muddier below? | Sentinel-2 NDTI on JRC surface-water pixels, below vs above (or now vs before) |
 | F | Inside a protected area? | WDPA. Licence register: manual check on the Minerals Commission map |
-| Ground | What does the clip show? | SAM 3.1 video segmentation of the river water; Muse Spark colour judgement (CIELAB rule as fallback) |
+| Ground | What does the clip show? | SAM 3.1 video segmentation of the river water; colour read from the middle of the water (bank shots have muddy edges); Muse Spark colour judgement (CIELAB rule as fallback) |
 
 The card shows **badges**, never a probability, and its wording only goes as far as the agreeing checks
 allow (e.g. "Likely source of this mud, not proven"). Proving illegality takes the authorities.
