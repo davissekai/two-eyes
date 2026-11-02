@@ -26,7 +26,7 @@ def test_share_llm_is_true():
 def test_share_text_falls_back_to_template_without_key(monkeypatch):
     monkeypatch.delenv("DEMO_MODE", raising=False)
     monkeypatch.delenv("MODEL_API_KEY", raising=False)
-    r = {"status": "NONE", "checks": {"A": {"pass": False}}, "scar": {}, "bridge": {}}
+    r = {"status": "NONE", "checks": {"A": {"pass": False}}, "scar": {}, "spot": {}}
     assert "No new forest clearing" in card.share_text(r)   # no Meta call, no crash
 
 
@@ -52,7 +52,7 @@ def test_demo_sam_boxes_are_labelled_illustrative():
 
 def test_demo_report_shape():
     r = demo.demo_report()
-    assert r["status"] == "SCAR" and r["bridge"]["name"] == "Birim, N4 bridge"
+    assert r["status"] == "SCAR" and r["spot"]["name"] == "Birim, N4 bridge"
     assert abs(r["scar"]["area_ha"] - 17.0) < 0.01 and abs(r["scar"]["distance_km"] - 19.0) < 0.5
     assert {k: v["pass"] for k, v in r["checks"].items()} == \
         {"A": True, "B": True, "C": None, "D": True, "E": None, "F": False}
@@ -136,3 +136,31 @@ def test_app_chip_texts():
     from two_eyes import app
     chip = app._chip_html()
     assert "SAM 3.1 refined 8 scars" in chip and "Muse Spark" in chip and "muddy brown" in chip
+
+
+def test_picking_a_known_spot_fills_its_coordinates_and_hides_the_custom_fields():
+    from two_eyes import app
+    name = list(app.DEMO_SPOTS)[1]
+    assert app.spot_pick(name) == (app.DEMO_SPOTS[name], False)
+
+
+def test_picking_custom_point_keeps_typed_coordinates_and_shows_the_fields():
+    from two_eyes import app
+    assert app.spot_pick("Custom point") == (None, True)
+
+
+def test_dropdown_label_is_readable_on_bone():
+    from two_eyes import app
+    css = app.build_css()
+    selector = '[data-testid="block-info"]'
+    assert selector in css and app.LATERITE in css.split(selector, 1)[1][:60]
+
+
+def test_sample_result_is_the_recorded_birim_case_in_its_own_folder(tmp_path, monkeypatch):
+    from two_eyes import app
+    monkeypatch.chdir(tmp_path)
+    s = app.sample_result()
+    assert os.path.exists(s["card_png"]) and os.path.join("two_eyes_out", "sample") in s["card_png"]
+    assert "wa.me" in s["share_html"]
+    assert "Birim" in str(s["report"]["spot"])
+    assert s["share_text"]

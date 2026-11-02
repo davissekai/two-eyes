@@ -2,7 +2,7 @@
 
 **Your phone sees the muddy river. The satellite sees the scar upstream.**
 
-Film a muddy river from a public bridge. Two Eyes traces the river upstream, looks for new forest
+Film a muddy river from a public spot: a bridge, a riverbank, a ferry landing. Two Eyes traces the river upstream, looks for new forest
 clearings in Sentinel-2 imagery (often galamsey, illegal gold mining, in Ghana), cross-checks them
 against independent datasets, and returns a dated, anonymous evidence card you can share on WhatsApp.
 
@@ -15,7 +15,7 @@ water colour in the clip; optional plain-English rewrite of the share text) on M
 | Check | Question | Method / data |
 |---|---|---|
 | A | Is there a new scar upstream? | Sentinel-2 SR, SCL + Cloud Score+ mask; NDVI-first candidates; SAM 3.1 box prompts refine outlines |
-| B | Does it drain to this bridge? | HydroBASINS level 12, `NEXT_DOWN` walk |
+| B | Does it drain to this spot? | HydroBASINS level 12, `NEXT_DOWN` walk |
 | C | Do outside alerts agree? | RADD radar alerts (WUR / Global Forest Watch), Hansen GFC v1.13 |
 | D | Does it look like mining? | Open-water pits inside the scar (MNDWI), WRI/Google DeepMind drivers v1.3 |
 | E | Is the river muddier below? | Sentinel-2 NDTI on JRC surface-water pixels, below vs above (or now vs before) |
@@ -51,7 +51,7 @@ Filming point: N4 trunk-road bridge over the Birim (6.28442, -0.46118), 307 km²
   licence status is a manual check).
 - Ground eye: SAM 3.1 tracked the water in every frame; Muse Spark: "muddy brown".
 - Speed: about 80 s for a new place; satellite results are cached per place (fixed dates), so a repeat
-  or pre-warmed bridge takes about 16 s, all of it the clip.
+  or pre-warmed spot takes about 16 s, all of it the clip.
 
 **The demo clip is a stand-in.** It is a slow pan made from the photograph
 ["Pra River Ghana.jpg"](https://commons.wikimedia.org/wiki/File:Pra_River_Ghana.jpg) (Pra River from the
@@ -79,7 +79,8 @@ Tests: `pytest tests` (pure-Python parts; no Earth Engine needed).
 ## Safety
 
 Film only from public places, never at mining sites. Clips are re-encoded with metadata (GPS) stripped,
-locations on the card are rounded to about 1 km, and nothing personal is stored.
+the filming spot is rounded to about 1 km on the card and in the shared report (the clearing itself
+stays precise, so officials can find it), and nothing personal is stored.
 
 ## Data and licences
 

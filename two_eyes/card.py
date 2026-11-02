@@ -12,7 +12,7 @@ import numpy as np
 
 from . import config as C
 
-BADGES = [("A", "New forest scar"), ("B", "Drains to this bridge"), ("C", "Alerts agree"),
+BADGES = [("A", "New forest scar"), ("B", "Drains to this spot"), ("C", "Alerts agree"),
           ("D", "Looks like mining"), ("E", "River muddier below"), ("F", "Inside a protected area")]
 
 # --- Field Evidence palette (LIGHT MODE card) ---
@@ -56,7 +56,7 @@ def headline(r):
     where = f"{s['area_ha']:.1f} ha, about {s['distance_km']:.0f} km upstream"
     if not B:
         return [f"A new forest clearing ({s['area_ha']:.1f} ha) was found nearby, but it drains elsewhere,",
-                "not to this bridge."]
+                "not to this spot."]
     if not Cc:
         # Lead + silt subline (Field Evidence card layout)
         lines.append(f"Possible forest clearing, {s['distance_km']:.0f} km upstream.")
@@ -114,6 +114,24 @@ def _meta_info(r):
         if g.get("water_found") and g.get("label"):
             quote = g["label"]
     return (n, f"Muse Spark: \u201c{quote}\u201d" if quote else None)
+
+
+def public_point(lat, lon):
+    """The filming spot as others see it: two decimals, about 1 km.
+
+    A riverbank can sit next to someone's farm or home, so the card, the shared report and the UI
+    never show it more precisely. (+ 0.0 turns a rounded -0.0 into 0.0.)
+    """
+    return round(lat, 2) + 0.0, round(lon, 2) + 0.0
+
+
+def location_text(spot):
+    """LOCATION row on the card: the rounded filming spot, saying it is rounded."""
+    lat, lon = spot.get("lat"), spot.get("lon")
+    if lat is None or lon is None:
+        return "\u2014"
+    lat, lon = public_point(lat, lon)
+    return f"{lat:.2f}, {lon:.2f} (to about 1 km)"
 
 
 def whatsapp_url(share_text):
@@ -250,11 +268,11 @@ def render(r, path):
     # --- 3. mono rows: RIVER | LOCATION | COMPARED | FINDING ---
     # FINDING is machine data but lime-on-bone fails AA — graphite value; lime reserved for chips/outlines
     ax = fig.add_subplot(gs[2]); ax.axis("off")
-    lat, lon = r["bridge"]["lat"], r["bridge"]["lon"]
     comp = f"Sentinel-2 · {_period(C.BEFORE)} vs {_period(C.AFTER)}"
     finding = f"{s['area_ha']:.1f} ha, {s['distance_km']:.0f} km upstream" if s.get("area_ha") else "—"
-    rows = [("RIVER", r["bridge"].get("name") or "Bridge", GRAPHITE),
-            ("LOCATION", f"{lat:.4f}, {lon:.4f}", GRAPHITE),
+    spot = r.get("spot") or {}
+    rows = [("RIVER", spot.get("name") or "River spot", GRAPHITE),
+            ("LOCATION", location_text(spot), GRAPHITE),
             ("COMPARED", comp, GRAPHITE),
             ("FINDING", finding, GRAPHITE)]
     n_refined, muse_quote = _meta_info(r)

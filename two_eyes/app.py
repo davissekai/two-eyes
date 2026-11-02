@@ -8,7 +8,7 @@ import os
 
 from . import card, demo, pipeline
 
-DEMO_BRIDGES = {
+DEMO_SPOTS = {
     "Birim, N4 bridge (6.28442, -0.46118)": (6.28442, -0.46118),
     "Birim, N6 bridge (6.38624, -0.55278)": (6.38624, -0.55278),
     "Densu, Akwadum bridge (6.111737, -0.343074)": (6.111737, -0.343074),
@@ -76,12 +76,14 @@ body {{background:{BONE} !important;}}
 .gradio-container label {{color:{LATERITE} !important; font-weight:600; background:transparent !important;}}
 .gradio-container label span {{color:{LATERITE} !important;}}
 .gradio-container .info {{color:{LATERITE} !important;}}
+/* dropdown labels use block-info, which the label rule above misses (Gradio default is near-white) */
+.gradio-container [data-testid="block-info"] {{color:{LATERITE} !important; font-weight:600;}}
 
 /* bone panels, graphite ~20% rules */
 .gradio-container .form, .gradio-container .block {{
   background-color:{PANEL} !important; border-color:{RULER} !important; border-radius:14px !important;
 }}
-/* Bone fields, Graphite text, Graphite~20% border — bridge dropdown matches lat/lon inputs */
+/* Bone fields, Graphite text, Graphite~20% border — spot dropdown matches lat/lon inputs */
 .gradio-container textarea, .gradio-container input, .gradio-container select,
 .gradio-container .wrap input, .gradio-container .wrap .secondary-wrap,
 .gradio-container [data-testid="dropdown"] , .gradio-container [data-testid="dropdown"] input,
@@ -157,6 +159,18 @@ body {{background:{BONE} !important;}}
                     letter-spacing:.08em; text-transform:uppercase; color:{LIME};
                     background:{GRAPHITE}; padding:4px 10px; border-radius:6px; margin-bottom:6px;}}
 
+/* custom lat/lon sit in a Gradio Group, whose default border is heavy */
+#custom-fields {{border:1px solid {RULER} !important; background:{PANEL} !important;
+                box-shadow:none !important; border-radius:14px !important;}}
+
+.gradio-container .plain {{background:transparent !important; border:none !important;
+                          box-shadow:none !important; padding:0 !important;}}
+/* section heads echo the hero serif; the sample tag says the opening result is a recorded run */
+.section-head {{font-family:IS,'Instrument Serif',serif; font-size:32px; line-height:1.1;
+               color:{GRAPHITE}; margin:4px 2px 0;}}
+.sample-tag {{display:inline-block; font-family:JB,'JetBrains Mono',monospace; font-size:12px;
+             color:{LATERITE}; border:1px dashed {RULER}; border-radius:99px; padding:4px 12px; margin:0 2px;}}
+
 /* footer note */
 #footnote {{border-top:1px solid {RULER}; margin-top:30px; padding:18px 4px 26px;
            font-size:12.5px; line-height:1.55; color:{LATERITE};}}
@@ -177,25 +191,51 @@ footer, .gradio-footer, .footer, .gradio-container footer {{display:none !import
     return _font_faces(css)
 
 
-def _resolve(bridge, lat, lon):
-    """Coordinates to check. Typed lat/lon that disagree with the chosen bridge win (custom point)."""
-    if bridge in DEMO_BRIDGES:
-        blat, blon = DEMO_BRIDGES[bridge]
+def spot_pick(spot):
+    """What picking a spot does to the form: (coordinates to fill or None, show the custom fields).
+
+    Coordinates only matter for a custom point, so the fields stay hidden for the named spots.
+    """
+    if spot in DEMO_SPOTS:
+        return DEMO_SPOTS[spot], False
+    return None, True
+
+
+def sample_result():
+    """The recorded Birim run, rendered offline, so the page opens on a real result and not empty boxes.
+
+    Written to its own folder so a later live run, which writes evidence_card.png in two_eyes_out,
+    never overwrites the card the page is showing.
+    """
+    r = demo.run(demo.SPOT["lat"], demo.SPOT["lon"], name=demo.SPOT["name"],
+                 out_dir=os.path.join(demo.OUT_DIR, "sample"), log=lambda *a: None)
+    return {
+        "card_png": r["card_png"],
+        "share_text": r["share_text"],
+        "share_html": _share_html(card.whatsapp_url(r["share_text"])),
+        "report": pipeline.public(r),
+    }
+
+
+def _resolve(spot, lat, lon):
+    """Coordinates to check. Typed lat/lon that disagree with the chosen spot win (custom point)."""
+    if spot in DEMO_SPOTS:
+        blat, blon = DEMO_SPOTS[spot]
         if lat is not None and lon is not None and abs(lat - blat) < 1e-4 and abs(lon - blon) < 1e-4:
-            return float(lat), float(lon), bridge.split(" (")[0]
+            return float(lat), float(lon), spot.split(" (")[0]
     if lat is None or lon is None:
         return None
     return float(lat), float(lon), "Custom point"
 
 
-def _run(bridge, lat, lon, clip):
+def _run(spot, lat, lon, clip):
     logs = []
     def log(*a):
         logs.append(" ".join(map(str, a)))
     try:
-        point = _resolve(bridge, lat, lon)
+        point = _resolve(spot, lat, lon)
         if point is None:
-            raise ValueError("Type both coordinates for a custom point, or pick a bridge from the list.")
+            raise ValueError("Type both coordinates for a custom point, or pick a spot from the list.")
         lat_f, lon_f, name = point
         credit = HERO_CREDIT if clip else None
         r = pipeline.run(lat_f, lon_f, name=name, clip=clip, clip_credit=credit, log=log)
@@ -250,7 +290,7 @@ def _hero_html():
         '<h1>Two Eyes</h1>'
         '<div class="tagline">Film the river. <i>Find the source.</i></div>'
         '<div class="sub">Your phone sees the muddy river. The satellite sees the scar upstream.</div>'
-        '<div class="small">Film a muddy river from a public bridge. We trace the river upstream for new '
+        '<div class="small">Film a muddy river from a bridge, riverbank or landing. We trace the river upstream for new '
         'forest clearings in Sentinel-2 imagery — often galamsey — cross-check them against independent '
         'datasets, and return a dated, anonymous evidence card you can share on WhatsApp. '
         'SAM 3.1 (Meta Model API) + Sentinel-2 (Earth Engine).</div>'
@@ -267,22 +307,30 @@ def launch(share=False, warm=True):
     import threading
     import gradio as gr
 
-    def _fill(bridge, lat, lon):
-        """Bridge picks fill the coordinate boxes; picking 'Custom point' leaves them as typed."""
-        if bridge in DEMO_BRIDGES:
-            return DEMO_BRIDGES[bridge]
-        if hasattr(gr, "skip"):
-            return gr.skip(), gr.skip()
-        return gr.update(), gr.update()
+    def _fill(spot):
+        """Spot picks fill the coordinate boxes; 'Custom point' leaves them as typed and shows them."""
+        coords, custom = spot_pick(spot)
+        if coords:
+            return coords[0], coords[1], gr.update(visible=custom)
+        keep = gr.skip() if hasattr(gr, "skip") else gr.update()
+        return keep, keep, gr.update(visible=custom)
 
-    def _warm_safe(bridges):
+    def _begin():
+        """Clear the sample as soon as a run starts, so progress never sits on top of a stale card."""
+        return gr.update(visible=False), None, "", "", None
+
+    scroll_to_results = ("() => { const el = document.getElementById('col-outputs'); "
+                         "if (el) el.scrollIntoView({behavior: 'smooth', block: 'start'}); }")
+    sample = sample_result()
+
+    def _warm_safe(spots):
         try:
-            pipeline.warm(bridges, log=lambda *a: None)
+            pipeline.warm(spots, log=lambda *a: None)
         except Exception as ex:
             print(f"[two_eyes] warm skipped: {type(ex).__name__}: {ex}")
 
     if warm:
-        threading.Thread(target=_warm_safe, args=(list(DEMO_BRIDGES.values()),), daemon=True).start()
+        threading.Thread(target=_warm_safe, args=(list(DEMO_SPOTS.values()),), daemon=True).start()
 
     banner = ''
     if demo.is_demo_mode():
@@ -296,19 +344,25 @@ def launch(share=False, warm=True):
         gr.HTML(_hero_html() + banner)
         with gr.Row(elem_id="row-main"):
             with gr.Column(elem_id="col-controls"):
-                bridge = gr.Dropdown(list(DEMO_BRIDGES) + ["Custom point"],
-                                     value=list(DEMO_BRIDGES)[0], label="Bridge")
-                lat = gr.Number(label="Latitude (custom)", value=6.28442)
-                lon = gr.Number(label="Longitude (custom)", value=-0.46118)
+                gr.HTML('<div class="section-head">Check a river</div>', elem_classes=["plain"])
+                spot = gr.Dropdown(list(DEMO_SPOTS) + ["Custom point"],
+                                   value=list(DEMO_SPOTS)[0], label="Where you filmed")
+                with gr.Group(visible=False, elem_id="custom-fields") as custom_fields:
+                    lat = gr.Number(label="Latitude", value=6.28442)
+                    lon = gr.Number(label="Longitude", value=-0.46118)
                 clip = gr.Video(label="Clip of the river (optional, ~10 s)")
                 go = gr.Button("Check upstream", variant="primary")
             with gr.Column(elem_id="col-outputs"):
-                img = gr.Image(label="Evidence card", type="filepath")
-                txt = gr.Textbox(label="WhatsApp message", lines=4)
-                share = gr.HTML(label="Share")
-                card_file = gr.File(label="Download evidence card")
-                log = gr.Textbox(label="What the checks did", lines=8)
-                js = gr.JSON(label="Full report")
+                gr.HTML('<div class="section-head">Case file</div>', elem_classes=["plain"])
+                sample_tag = gr.HTML(f'<span class="sample-tag">Sample: recorded run, '
+                                     f'{demo.SPOT["name"]}, 28 Oct 2026</span>', elem_classes=["plain"])
+                img = gr.Image(value=sample["card_png"], label="Evidence card", type="filepath")
+                txt = gr.Textbox(value=sample["share_text"], label="WhatsApp message", lines=4)
+                share = gr.HTML(value=sample["share_html"], label="Share")
+                card_file = gr.File(value=sample["card_png"], label="Download evidence card")
+                with gr.Accordion("How the checks ran", open=False):
+                    log = gr.Textbox(label="What the checks did", lines=8)
+                    js = gr.JSON(value=sample["report"], label="Full report")
         footer = ('<div id="footnote">Safety: film only from public places, never at mining sites. '
                   'Clips are re-encoded with GPS metadata stripped; locations on the card are rounded to '
                   'about 1 km; no personal data is kept.<br>'
@@ -317,8 +371,10 @@ def launch(share=False, warm=True):
                   'Sources: Sentinel-2 (ESA/Copernicus), HydroBASINS (WWF), RADD (WUR/GFW), '
                   'Hansen GFC (UMD), WDPA (UNEP-WCMC), JRC water.</div>')
         gr.HTML(footer)
-        go.click(_run, [bridge, lat, lon, clip], [img, txt, log, js, share, card_file])
-        bridge.change(_fill, [bridge, lat, lon], [lat, lon])
+        go.click(_begin, None, [sample_tag, img, txt, share, card_file]).then(
+            None, None, None, js=scroll_to_results).then(
+            _run, [spot, lat, lon, clip], [img, txt, log, js, share, card_file])
+        spot.change(_fill, [spot], [lat, lon, custom_fields])
     # Gradio 6: css and theme live in launch(), not Blocks
     ui.launch(share=share, debug=False, css=build_css(), theme=theme)
 

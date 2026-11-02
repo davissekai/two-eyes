@@ -1,4 +1,4 @@
-"""Bridge point (+ optional clip) -> evidence report and card."""
+"""Filming spot on a river (+ optional clip) -> evidence report and card."""
 import datetime as dt
 import hashlib
 import json
@@ -53,7 +53,7 @@ def _inside(prev, lat, lon):
 
 
 CACHE_DIR = os.environ.get("TWO_EYES_CACHE", os.path.expanduser("~/.two_eyes_cache"))
-CACHE_VERSION = "v2"   # bump when the sky pipeline changes
+CACHE_VERSION = "v3"   # bump when the sky pipeline changes
 
 
 def _cache_key(lat, lon, focus):
@@ -62,16 +62,16 @@ def _cache_key(lat, lon, focus):
     return os.path.join(CACHE_DIR, hashlib.sha1(k.encode()).hexdigest()[:16] + ".pkl")
 
 
-def sky_part(bridge_lat, bridge_lon, focus=None, use_sam=True, log=print, timings=None):
+def sky_part(lat, lon, focus=None, use_sam=True, log=print, timings=None):
     """Everything that depends only on the place and the fixed dates (checks A-F). Cacheable."""
     t = timings if timings is not None else {}
     clock = time.time()
     r = {"checks": {}, "candidates": []}
-    log("Tracing the catchment above the bridge (HydroBASINS level 12)...")
-    basins = Basins(bridge_lat, bridge_lon)
-    bb = basins.basin_of(bridge_lat, bridge_lon)
+    log("Tracing the catchment above the filming spot (HydroBASINS level 12)...")
+    basins = Basins(lat, lon)
+    bb = basins.basin_of(lat, lon)
     ids, searched, total = nearest_upstream(basins, bb)
-    r["catchment"] = {"bridge_basin": bb, "basins_searched": len(ids), "km2_searched": round(searched),
+    r["catchment"] = {"spot_basin": bb, "basins_searched": len(ids), "km2_searched": round(searched),
                       "km2_upstream_total": round(total)}
     t["catchment_s"] = round(time.time() - clock, 1); clock = time.time()
 
@@ -110,7 +110,7 @@ def sky_part(bridge_lat, bridge_lon, focus=None, use_sam=True, log=print, timing
     r["status"] = "SCAR"
     r["scar"] = {"lat": clat, "lon": clon, "area_ha": s["area_ha"], "cloudy": s["cloudy"],
                  "outline_method": s["outline_method"], "ndvi_before": s["ndvi_before"],
-                 "ndvi_after": s["ndvi_after"], "distance_km": km(bridge_lat, bridge_lon, clat, clon),
+                 "ndvi_after": s["ndvi_after"], "distance_km": km(lat, lon, clat, clon),
                  "rgb_before": s["rgb_before"], "rgb_after": s["rgb_after"], "mask": s["mask"]}
     r["checks"]["A"] = {"pass": True, "area_ha": s["area_ha"], "outline": s["outline_method"]}
     log("Checks B-F, in parallel...")
@@ -135,7 +135,7 @@ def sky_part(bridge_lat, bridge_lon, focus=None, use_sam=True, log=print, timing
     return r
 
 
-def run(bridge_lat, bridge_lon, name=None, clip=None, clip_credit=None, focus=None, use_sam=True, use_llm=True,
+def run(lat, lon, name=None, clip=None, clip_credit=None, focus=None, use_sam=True, use_llm=True,
         out_dir="two_eyes_out", log=print, use_cache=True):
     """Run every check for a filming point.
 
@@ -144,7 +144,7 @@ def run(bridge_lat, bridge_lon, name=None, clip=None, clip_credit=None, focus=No
     citizen's clip is always analysed fresh, in parallel with the satellite work.
     """
     if demo.is_demo_mode():
-        return demo.run(bridge_lat, bridge_lon, name=name, clip=clip, clip_credit=clip_credit,
+        return demo.run(lat, lon, name=name, clip=clip, clip_credit=clip_credit,
                         out_dir=out_dir, log=log)
     t0 = time.time()
     os.makedirs(out_dir, exist_ok=True)
@@ -165,7 +165,7 @@ def run(bridge_lat, bridge_lon, name=None, clip=None, clip_credit=None, focus=No
     if clip:
         log("Ground eye: SAM 3.1 on the clip (running alongside the satellite checks)...")
 
-    path = _cache_key(bridge_lat, bridge_lon, focus)
+    path = _cache_key(lat, lon, focus)
     sky_r = None
     if use_cache and os.path.exists(path):
         try:
@@ -176,13 +176,13 @@ def run(bridge_lat, bridge_lon, name=None, clip=None, clip_credit=None, focus=No
         except Exception:
             sky_r = None
     if sky_r is None:
-        sky_r = sky_part(bridge_lat, bridge_lon, focus=focus, use_sam=use_sam, log=log, timings=timings)
+        sky_r = sky_part(lat, lon, focus=focus, use_sam=use_sam, log=log, timings=timings)
         if use_cache:
             os.makedirs(CACHE_DIR, exist_ok=True)
             with open(path, "wb") as f:
                 pickle.dump(sky_r, f)
 
-    r = {"date": dt.date.today().isoformat(), "bridge": {"lat": bridge_lat, "lon": bridge_lon, "name": name},
+    r = {"date": dt.date.today().isoformat(), "spot": {"lat": lat, "lon": lon, "name": name},
          "periods": {"before": C.BEFORE, "now": C.AFTER}}
     r.update(sky_r)
     if gfut:
@@ -205,13 +205,13 @@ def run(bridge_lat, bridge_lon, name=None, clip=None, clip_credit=None, focus=No
     return r
 
 
-def warm(bridges, log=print):
-    """Pre-compute the satellite part for demo bridges so live runs only wait for the clip.
+def warm(spots, log=print):
+    """Pre-compute the satellite part for the demo spots so live runs only wait for the clip.
     No-op in demo mode (when Earth Engine is not available, for example)."""
     if demo.is_demo_mode():
         log("Warm skipped: demo mode (no Earth Engine or Meta API calls).")
         return
-    for lat, lon in bridges:
+    for lat, lon in spots:
         try:
             t = time.time()
             run(lat, lon, use_llm=False, log=lambda *a: None)
@@ -231,11 +231,18 @@ def _json_default(o):
 
 
 def public(r):
-    """Report without image arrays (for JSON / sharing)."""
+    """Report without image arrays, and with the filming spot rounded to about 1 km (for JSON / sharing).
+
+    The clearing keeps its full precision: that is the evidence officials need to find it.
+    """
     def strip(x):
         if isinstance(x, dict):
             return {k: strip(v) for k, v in x.items() if not isinstance(v, np.ndarray) and k != "grid"}
         if isinstance(x, list):
             return [strip(v) for v in x]
         return x
-    return strip(r)
+    out = strip(r)
+    spot = out.get("spot")
+    if spot and spot.get("lat") is not None and spot.get("lon") is not None:
+        spot["lat"], spot["lon"] = card.public_point(spot["lat"], spot["lon"])
+    return out

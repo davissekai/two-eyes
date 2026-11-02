@@ -67,6 +67,13 @@ def muddiness(frames, masks):
             "frames_used": len(bs), "muddy": muddy, "label_source": "colour rule"}
 
 
+# Citizens film from bridges, riverbanks, ferry landings and footpaths, not only from above.
+COLOUR_QUESTION = (
+    'This is a river filmed from a bridge or a riverbank. Looking only at the river water, is it muddy '
+    '(brown/orange sediment), clear, or impossible to judge (glare, darkness)? Answer only JSON: '
+    '{"water": "muddy|clear|cannot_tell", "reason": "<12 words>"}')
+
+
 def judge_colour(frame, mask=None):
     """Ask Muse Spark (image understanding) what the river water looks like. Returns dict or None.
     With a mask, only the water crop is sent; without one, the whole frame (lets it run alongside SAM)."""
@@ -80,11 +87,8 @@ def judge_colour(frame, mask=None):
         crop = frame
     buf = io.BytesIO(); Image.fromarray(crop).save(buf, format="JPEG", quality=85)
     url = "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
-    q = ('This is a river seen from a bridge. Looking only at the river water, is it muddy (brown/orange sediment), clear, or '
-         'impossible to judge (glare, darkness)? Answer only JSON: {"water": "muddy|clear|cannot_tell", '
-         '"reason": "<12 words>"}')
     resp = client().responses.create(model=C.TEXT_MODEL, input=[{"type": "message", "role": "user", "content": [
-        {"type": "input_text", "text": q}, {"type": "input_image", "image_url": url}]}])
+        {"type": "input_text", "text": COLOUR_QUESTION}, {"type": "input_image", "image_url": url}]}])
     t = resp.output_text.strip()
     t = t[t.find("{"): t.rfind("}") + 1]
     d = json.loads(t)

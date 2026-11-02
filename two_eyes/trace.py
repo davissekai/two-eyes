@@ -54,13 +54,13 @@ def downstream_chain(start, props):
     return chain
 
 
-def check_b(basins, bridge_basin, scar_lat, scar_lon):
-    """Badge for one scar: does it drain to the bridge?"""
+def check_b(basins, spot_basin, scar_lat, scar_lon):
+    """Badge for one scar: does it drain to the filming spot?"""
     b = basins.basin_of(scar_lat, scar_lon)
-    up = basins.upstream(bridge_basin)
+    up = basins.upstream(spot_basin)
     if b not in up:
         return {"pass": False, "basin": b, "note": "drains elsewhere"}
-    if b == bridge_basin:
+    if b == spot_basin:
         return {"pass": True, "basin": b, "same_basin": True,
-                "note": "same small basin as the bridge: probably upstream, not certain"}
-    return {"pass": True, "basin": b, "same_basin": False, "note": "drains to the bridge"}
+                "note": "same small basin as the filming spot: probably upstream, not certain"}
+    return {"pass": True, "basin": b, "same_basin": False, "note": "drains to the filming spot"}

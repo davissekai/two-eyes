@@ -20,7 +20,7 @@ ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 
 # The recorded run (28 Oct 2026, see README "End-to-end demo"): N4 bridge over the Birim,
 # 24 NDVI candidates, 8 refined with SAM 3.1. Lead scar 17.0 ha, ~19 km upstream.
-BRIDGE = {"name": "Birim, N4 bridge", "lat": 6.28442, "lon": -0.46118}
+SPOT = {"name": "Birim, N4 bridge", "lat": 6.28442, "lon": -0.46118}
 SCAR = {"lat": 6.45440, "lon": -0.48330, "area_ha": 17.0, "distance_km": 19.0,
         "ndvi_before": 0.71, "ndvi_after": 0.17, "cloudy": 0.06}
 # The bundled still is the Goldenwabbit bridge photo, not the old Pra/Beposo clip.
@@ -94,10 +94,10 @@ def demo_report():
         "date": DATE,
         "demo": True,
         "credit_sat": COPERNICUS_CREDIT,
-        "bridge": dict(BRIDGE),
+        "spot": dict(SPOT),
         "periods": {"before": C.BEFORE, "now": C.AFTER},
         "status": "SCAR",
-        "catchment": {"bridge_basin": None, "basins_searched": 74, "km2_searched": 307,
+        "catchment": {"spot_basin": None, "basins_searched": 74, "km2_searched": 307,
                       "km2_upstream_total": 1620, "cloudy_share": 0.06},
         "candidates": [
             {"lat": SCAR["lat"], "lon": SCAR["lon"], "status": "SCAR",
@@ -135,7 +135,7 @@ def _still():
     return np.asarray(Image.open(_asset("hero_mask.jpg")).convert("RGB"))
 
 
-def run(bridge_lat, bridge_lon, name=None, clip=None, clip_credit=None, use_llm=False,
+def run(lat, lon, name=None, clip=None, clip_credit=None, use_llm=False,
         out_dir=OUT_DIR, log=print):
     """The demo twin of pipeline.run: renders the card + share text from the cached report. Offline.
 
@@ -146,14 +146,14 @@ def run(bridge_lat, bridge_lon, name=None, clip=None, clip_credit=None, use_llm=
     from . import pipeline                       # runtime import: no import-time cycle
     t0 = time.time()
     os.makedirs(out_dir, exist_ok=True)
-    same_place = (name == BRIDGE["name"] and round(bridge_lat, 4) == round(BRIDGE["lat"], 4)
-                  and round(bridge_lon, 4) == round(BRIDGE["lon"], 4))
+    same_place = (name == SPOT["name"] and round(lat, 4) == round(SPOT["lat"], 4)
+                  and round(lon, 4) == round(SPOT["lon"], 4))
     if same_place:
         log("Demo mode: cached %s result from 28 Oct 2026 (no Earth Engine or Meta API calls)."
-            % BRIDGE["name"])
+            % SPOT["name"])
     else:
         log("Demo mode: this point was not analysed live; showing the cached %s result recorded "
-            "28 Oct 2026 (no Earth Engine or Meta API calls)." % BRIDGE["name"])
+            "28 Oct 2026 (no Earth Engine or Meta API calls)." % SPOT["name"])
     if clip:
         log("Demo mode: the clip is not analysed here (cached result shown instead).")
 

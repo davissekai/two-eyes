@@ -65,7 +65,7 @@ def test_yydoy():
 
 
 def _report(**k):
-    r = {"date": "2026-10-28", "status": "SCAR", "bridge": {"lat": 6.28442, "lon": -0.46118, "name": "N4 Birim bridge"},
+    r = {"date": "2026-10-28", "status": "SCAR", "spot": {"lat": 6.28442, "lon": -0.46118, "name": "N4 Birim bridge"},
          "scar": {"area_ha": 4.3, "distance_km": 13.1}, "checks": {}}
     r["checks"].update(k)
     return r

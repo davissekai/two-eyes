@@ -20,7 +20,7 @@ def setup(g=None, project=None):
     print("Earth Engine OK; Meta key loaded:", bool(os.environ.get("MODEL_API_KEY")))
 
 
-def smoke(g=None, bridge=(6.28442, -0.46118), name="Birim, N4 bridge", clip=None, validate_first=True,
+def smoke(g=None, spot=(6.28442, -0.46118), name="Birim, N4 bridge", clip=None, validate_first=True,
           clip_credit=None, focus=None):
     from . import pipeline, validate
     setup(g)
@@ -30,7 +30,7 @@ def smoke(g=None, bridge=(6.28442, -0.46118), name="Birim, N4 bridge", clip=None
         validate.run({k: (S[k]["lat"], S[k]["lon"]) for k in ("intact_forest", "cocoa_farm") if S.get(k, {}).get("lat")})
         print(f"[validation took {time.time() - t:.0f}s]")
     t = time.time()
-    r = pipeline.run(bridge[0], bridge[1], name=name, clip=clip, clip_credit=clip_credit, focus=focus)
+    r = pipeline.run(spot[0], spot[1], name=name, clip=clip, clip_credit=clip_credit, focus=focus)
     print(f"[pipeline took {time.time() - t:.0f}s]")
     print("CHECK C:", json.dumps(r["checks"].get("C"), default=str))
     print(json.dumps(pipeline.public(r), indent=1, default=str)[:6000])
