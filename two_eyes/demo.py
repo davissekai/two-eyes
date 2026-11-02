@@ -125,10 +125,16 @@ def demo_report():
                    "muse_quote": "muddy brown",
                    # The bundled still is an illustrative painted water mask, not SAM 3.1 output.
                    "method": "Illustrative painted water mask on the bridge frame (demo; not SAM output)",
-                   "frames_used": 10, "still": _still(), "credit": CREDIT},
+                   "frames_used": 10, "frame": _frame(), "still": _still(), "credit": CREDIT,
+                   # Median RGB of the painted water pixels in the bundled photo (not a live measurement).
+                   "rgb": [217, 190, 158]},
         # README recorded run: "24 NDVI candidates, 8 refined with SAM 3.1".
         "meta": {"sam_refined": 8, "muse_quote": "muddy brown"},
     }
+
+
+def _frame():
+    return np.asarray(Image.open(_asset("bridge.jpg")).convert("RGB").resize((720, 404)))
 
 
 def _still():

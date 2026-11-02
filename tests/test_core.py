@@ -95,6 +95,13 @@ def test_muddiness_labels():
     assert ground.muddiness([blue], {})["water_found"] is False
 
 
+def test_muddiness_reports_the_water_colour_for_the_swatch():
+    brown = np.zeros((40, 40, 3), np.uint8); brown[:] = (150, 110, 60)
+    brown[:5] = (250, 250, 250)                       # bright bank outside the mask
+    m = np.zeros((40, 40), bool); m[10:, :] = True
+    assert ground.muddiness([brown], {0: m})["rgb"] == [150, 110, 60]
+
+
 def test_card_renders(tmp_path):
     rgb = (np.random.rand(200, 200, 3) * 255).astype(np.uint8)
     mask = np.zeros((200, 200), bool); mask[80:120, 90:130] = True

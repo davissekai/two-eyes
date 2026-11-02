@@ -45,13 +45,15 @@ def lab_l(rgb_pixels):
 
 
 def muddiness(frames, masks):
-    """Median CIELAB of water pixels across frames, and a rough colour label (fallback when no VLM)."""
-    bs, ls = [], []
+    """Median CIELAB of water pixels across frames, a rough colour label (fallback when no VLM), and
+    the median RGB of the water, which the page shows as a colour swatch."""
+    bs, ls, rgbs = [], [], []
     for i, f in enumerate(frames):
         m = masks.get(i)
         if m is not None and m.shape == f.shape[:2] and m.sum() > 200:
             bs.append(np.median(lab_b(f[m])))
             ls.append(np.median(lab_l(f[m])))
+            rgbs.append(np.median(f[m], axis=0))
     if not bs:
         return {"water_found": False, "label": "no water found", "b_star": None, "frames_used": 0}
     b, L = float(np.median(bs)), float(np.median(ls))
@@ -64,7 +66,8 @@ def muddiness(frames, masks):
     else:
         label, muddy = "somewhat cloudy", None
     return {"water_found": True, "b_star": round(b, 1), "L_star": round(L, 1), "label": label,
-            "frames_used": len(bs), "muddy": muddy, "label_source": "colour rule"}
+            "frames_used": len(bs), "muddy": muddy, "label_source": "colour rule",
+            "rgb": [int(round(v)) for v in np.median(rgbs, axis=0)]}
 
 
 # Citizens film from bridges, riverbanks, ferry landings and footpaths, not only from above.
@@ -99,7 +102,7 @@ def judge_colour(frame, mask=None):
             "reason": str(d.get("reason", ""))[:120], "label_source": "Muse Spark (image understanding)"}
 
 
-def overlay(frame, mask, color=(255, 120, 0), alpha=0.45):
+def overlay(frame, mask, color=(212, 255, 58), alpha=0.55):
     out = frame.astype(np.float32).copy()
     out[mask] = out[mask] * (1 - alpha) + np.array(color, np.float32) * alpha
     return out.astype(np.uint8)
@@ -130,6 +133,7 @@ def analyse_clip(src, use_sam=True, use_vlm=True):
                 res["vlm_error"] = type(e).__name__
     best = max(masks, key=lambda k: masks[k].sum()) if masks else len(frames) // 2
     best = min(best, len(frames) - 1)
-    res.update(method=method, n_frames=len(frames),
+    # frame: what the citizen filmed; still: the same frame with the measured water painted lime.
+    res.update(method=method, n_frames=len(frames), frame=frames[best],
                still=overlay(frames[best], masks[best]) if best in masks else frames[best])
     return res

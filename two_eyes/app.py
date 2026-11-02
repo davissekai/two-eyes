@@ -1,194 +1,39 @@
-"""Web UI (Gradio) in Field Evidence LIGHT MODE: bone page, graphite type; machine lime on graphite chips.
+"""Web UI (Gradio): check a river spot, watch the check run, read the case file, share the card.
 
 Local:   DEMO_MODE=1 python -m two_eyes.app        (offline demo, no API keys needed)
 Colab:   from two_eyes.app import launch; launch(share=True)
 """
-import base64
 import os
+import queue
+import threading
+import time
 
-from . import card, demo, pipeline
+from . import case_file, demo, pipeline, readout
+from . import share as share_ui   # `share` is launch()'s public-link flag
+from .look import ASSETS, LATERITE, build_css  # noqa: F401  (LATERITE: tests check the label colour)
 
 DEMO_SPOTS = {
     "Birim, N4 bridge (6.28442, -0.46118)": (6.28442, -0.46118),
     "Birim, N6 bridge (6.38624, -0.55278)": (6.38624, -0.55278),
     "Densu, Akwadum bridge (6.111737, -0.343074)": (6.111737, -0.343074),
 }
+CUSTOM = "Custom point"
 
 # The bundled bridge/hero imagery is the Goldenwabbit photo, not the old Pra/Beposo clip.
 HERO_CREDIT = "Photo: Goldenwabbit, Wikimedia Commons, CC BY-SA 4.0"
 
-ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
-
-# Field Evidence tokens — LIGHT MODE (atelier brand kit, direction A inverted)
-GRAPHITE = "#15130F"
-BONE = "#F2EDE4"          # page background
-PANEL = "#FAF7F1"         # lighter bone panels
-PANEL2 = "#E8E1D5"        # darker bone panels / wells
-SILT = "#C9A27E"          # rules + borders ONLY (fails WCAG AA as text on bone)
-LATERITE = "#9C5A34"      # secondary text (AA on bone)
-LIME = "#D4FF3A"          # machine accent only: on graphite chips or over imagery
-WA = "#25D366"            # WhatsApp share button only
-
-BASE = BONE               # page = bone
-RULER = "rgba(21,19,15,.20)"   # graphite ~20% field/panel borders
-FIELD_BORDER = "rgba(21,19,15,.20)"
-
-_EYES_MARK = (
-    # On bone: sky-eye ring + ticks in Graphite; lime only as small pupil with Graphite outline (no plate)
-    '<svg viewBox="0 0 220 110" width="150" height="75" xmlns="http://www.w3.org/2000/svg" '
-    'aria-label="Two Eyes mark">'
-    '<circle cx="55" cy="55" r="44" fill="none" stroke="#15130F" stroke-width="5"/>'
-    '<circle cx="55" cy="55" r="11" fill="#9C5A34"/>'
-    '<circle cx="165" cy="55" r="44" fill="none" stroke="#15130F" stroke-width="5"/>'
-    '<g stroke="#15130F" stroke-width="4">'
-    '<line x1="165" y1="3" x2="165" y2="17"/><line x1="165" y1="93" x2="165" y2="107"/>'
-    '<line x1="113" y1="55" x2="127" y2="55"/><line x1="203" y1="55" x2="217" y2="55"/></g>'
-    '<circle cx="165" cy="55" r="11" fill="#D4FF3A" stroke="#15130F" stroke-width="2"/>'
-    '<path d="M66 55 C 90 30, 110 80, 154 55" fill="none" stroke="#15130F" stroke-width="3" '
-    'stroke-dasharray="6 6"/></svg>'
-)
-
-
-def _font_faces(css):
-    """Append @font-face rules with the bundled fonts re-encoded as data URIs (loads offline)."""
-    faces = [
-        ("IS", os.path.join(ASSETS, "fonts", "InstrumentSerif-Regular.ttf"), "normal", ""),
-        ("IS", os.path.join(ASSETS, "fonts", "InstrumentSerif-Italic.ttf"), "italic", ""),
-        ("G", os.path.join(ASSETS, "fonts", "Geist-VariableFont_wght.ttf"), "normal", ";font-weight:100 900"),
-        ("JB", os.path.join(ASSETS, "fonts", "JetBrainsMono-VariableFont_wght.ttf"), "normal", ";font-weight:100 800"),
-    ]
-    for fam, path, style, weight in faces:
-        with open(path, "rb") as f:
-            b64 = base64.b64encode(f.read()).decode()
-        css += (f"@font-face{{font-family:{fam};font-style:{style}{weight};"
-                f"src:url(data:font/ttf;base64,{b64})}}")
-    return css
-
-
-def build_css():
-    css = f"""
-body {{background:{BONE} !important;}}
-.gradio-container {{
-  background:{BONE} !important; color:{GRAPHITE} !important; max-width:1180px !important;
-  font-family:G,'Geist',Arial,sans-serif !important; padding-bottom:0 !important;
-}}
-.gradio-container h1, .gradio-container h2, .gradio-container h3 {{color:{GRAPHITE};}}
-.gradio-container label {{color:{LATERITE} !important; font-weight:600; background:transparent !important;}}
-.gradio-container label span {{color:{LATERITE} !important;}}
-.gradio-container .info {{color:{LATERITE} !important;}}
-/* dropdown labels use block-info, which the label rule above misses (Gradio default is near-white) */
-.gradio-container [data-testid="block-info"] {{color:{LATERITE} !important; font-weight:600;}}
-
-/* bone panels, graphite ~20% rules */
-.gradio-container .form, .gradio-container .block {{
-  background-color:{PANEL} !important; border-color:{RULER} !important; border-radius:14px !important;
-}}
-/* Bone fields, Graphite text, Graphite~20% border — spot dropdown matches lat/lon inputs */
-.gradio-container textarea, .gradio-container input, .gradio-container select,
-.gradio-container .wrap input, .gradio-container .wrap .secondary-wrap,
-.gradio-container [data-testid="dropdown"] , .gradio-container [data-testid="dropdown"] input,
-.gradio-container .container > .wrap, .gradio-container .input-container,
-.gradio-container .dropdown-container, .gradio-container .wrap.full {{
-  background:{PANEL} !important; color:{GRAPHITE} !important; border:1px solid {FIELD_BORDER} !important;
-  font-size:15px !important; border-radius:10px !important;
-  box-shadow:none !important;
-}}
-.gradio-container textarea::placeholder, .gradio-container input::placeholder {{
-  color:{LATERITE} !important; opacity:.75;}}
-.gradio-container ul.options, .gradio-container ul[class*='option'],
-.gradio-container [role="listbox"] {{
-  background:{PANEL} !important; border:1px solid {FIELD_BORDER} !important; color:{GRAPHITE} !important;}}
-.gradio-container ul.options li, .gradio-container ul[class*='option'] li,
-.gradio-container [role="option"] {{color:{GRAPHITE} !important; background:{PANEL} !important;}}
-.gradio-container ul.options li:hover, .gradio-container ul[class*='option'] li:hover,
-.gradio-container [role="option"]:hover {{
-  background:{PANEL2} !important; color:{GRAPHITE} !important;}}
-.gradio-container .dropdown-arrow, .gradio-container .icon-wrap {{color:{GRAPHITE} !important;}}
-#col-controls .wrap, #col-controls input, #col-controls select {{
-  background:{PANEL} !important; color:{GRAPHITE} !important; border-color:{FIELD_BORDER} !important;}}
-
-/* primary button: graphite fill, bone label, large tap target */
-.gradio-container button.primary {{
-  background:{GRAPHITE} !important; color:{BONE} !important; border:none !important;
-  border-radius:12px !important; font-weight:700 !important; min-height:54px !important;
-  font-size:1.06rem !important; letter-spacing:.02em;
-}}
-.gradio-container button.primary:hover {{background:#000000 !important;}}
-.gradio-container button.secondary, .gradio-container button:not(.primary) {{
-  background:{PANEL} !important; color:{GRAPHITE} !important; border:1px solid {RULER} !important;
-  border-radius:10px !important; min-height:42px;
-}}
-
-/* outputs */
-.gradio-container pre, .gradio-container [class*='json'], .gradio-container [class*='json'] * {{
-  background:{PANEL2} !important; color:{GRAPHITE} !important;
-}}
-.gradio-container img, .gradio-container video {{
-  border-radius:14px; border:1px solid {RULER};}}
-.gradio-container .status {{color:{LATERITE} !important;}}
-.gradio-container textarea {{min-height:88px;}}
-
-/* hero */
-.hero {{display:grid; grid-template-columns:1.15fr .85fr; gap:34px; align-items:center;
-       padding:40px 6px 26px;}}
-.hero-mark {{margin-bottom:6px;}}
-.hero h1 {{font-family:IS,'Instrument Serif',serif; font-weight:400;
-          font-size:clamp(58px,9vw,108px); line-height:.92; letter-spacing:-.02em;
-          margin:10px 0 14px; color:{GRAPHITE};}}
-.hero .tagline {{font-family:IS,'Instrument Serif',serif; font-size:clamp(19px,2.6vw,28px);
-                font-weight:400; color:{GRAPHITE};}}
-.hero .tagline i {{color:{LATERITE}; font-style:italic;}}
-.sub {{font-size:clamp(15px,2vw,19px); font-weight:500; line-height:1.45; color:{GRAPHITE}; margin-top:14px;}}
-.small {{font-size:clamp(13px,1.7vw,15px); line-height:1.55; margin-top:10px; color:{LATERITE};}}
-.hero-img {{width:100%; border-radius:16px; border:1px solid {RULER}; display:block;}}
-.hero-cap {{font-family:JB,'JetBrains Mono',monospace; letter-spacing:.04em; font-size:11px;
-           color:{LATERITE}; margin-top:8px; text-align:center; opacity:.9;}}
-
-/* machine chips: graphite fill + lime text (lime never sits on bone as text) */
-.chip-row {{margin-top:10px;}}
-.chip {{display:inline-block;border:1.5px solid {GRAPHITE};color:{LIME};
-       font-family:JB,'JetBrains Mono',monospace;font-weight:500;
-       text-transform:uppercase;letter-spacing:.08em;
-       border-radius:99px;padding:6px 13px;font-size:12px;margin:0 10px 10px 0;
-       background:{GRAPHITE};}}
-
-/* demo banner: panel with graphite~20% rule; DEMO chip is graphite+lime */
-#demo-banner {{border:1.5px solid {RULER}; color:{GRAPHITE}; border-radius:12px;
-              padding:12px 16px; font-size:14px; line-height:1.5; background:{PANEL};}}
-#demo-banner .mono {{display:inline-block; font-family:JB,'JetBrains Mono',monospace;
-                    letter-spacing:.08em; text-transform:uppercase; color:{LIME};
-                    background:{GRAPHITE}; padding:4px 10px; border-radius:6px; margin-bottom:6px;}}
-
-/* custom lat/lon sit in a Gradio Group, whose default border is heavy */
-#custom-fields {{border:1px solid {RULER} !important; background:{PANEL} !important;
-                box-shadow:none !important; border-radius:14px !important;}}
-
-.gradio-container .plain {{background:transparent !important; border:none !important;
-                          box-shadow:none !important; padding:0 !important;}}
-/* section heads echo the hero serif; the sample tag says the opening result is a recorded run */
-.section-head {{font-family:IS,'Instrument Serif',serif; font-size:32px; line-height:1.1;
-               color:{GRAPHITE}; margin:4px 2px 0;}}
-.sample-tag {{display:inline-block; font-family:JB,'JetBrains Mono',monospace; font-size:12px;
-             color:{LATERITE}; border:1px dashed {RULER}; border-radius:99px; padding:4px 12px; margin:0 2px;}}
-
-/* footer note */
-#footnote {{border-top:1px solid {RULER}; margin-top:30px; padding:18px 4px 26px;
-           font-size:12.5px; line-height:1.55; color:{LATERITE};}}
-
-/* mobile-first: stack the columns on small screens (e.g. 390px phones) */
-@media (max-width:760px) {{
-  .hero {{grid-template-columns:1fr; gap:18px; padding:24px 4px 14px;}}
-  #row-main {{display:flex !important; flex-wrap:wrap !important; row-gap:16px;}}
-  #col-controls, #col-outputs {{
-    min-width:100% !important; width:100% !important; max-width:100% !important;}}
-  .gradio-container button.primary {{min-height:58px;}}
-}}
-
-/* hide the "Built with Gradio" attribution / footer */
-footer, .gradio-footer, .footer, .gradio-container footer {{display:none !important;
-  visibility:hidden !important; height:0 !important; overflow:hidden !important;}}
-"""
-    return _font_faces(css)
+# Asks the phone for its position. Needs https or localhost; on refusal the fields stay empty to type in.
+LOCATE_JS = """async () => {
+  try {
+    const p = await new Promise((ok, no) => navigator.geolocation.getCurrentPosition(ok, no,
+      {enableHighAccuracy: true, timeout: 15000}));
+    return [p.coords.latitude, p.coords.longitude];
+  } catch (e) { return [null, null]; }
+}"""
+# The brand is light mode only; Gradio would otherwise follow a dark phone and turn the text white.
+LIGHT_JS = "() => { document.body.classList.remove('dark'); document.documentElement.classList.remove('dark'); }"
+SCROLL_JS = ("() => { const el = document.getElementById('readout'); "
+             "if (el) el.scrollIntoView({behavior: 'smooth', block: 'start'}); }")
 
 
 def spot_pick(spot):
@@ -201,6 +46,20 @@ def spot_pick(spot):
     return None, True
 
 
+def sections(r):
+    """Every case-file section for one report (live or demo), as HTML, plus the card and message."""
+    return {
+        "verdict": case_file.verdict_html(r),
+        "trace": case_file.trace_html(r) if case_file.evidence_level(r) else "",
+        "eyes": case_file.eyes_html(r),
+        "preview": share_ui.preview_html(r["share_text"], r["card_png"]),
+        "share_html": share_ui.buttons_html(r["share_text"]),
+        "card_png": r["card_png"],
+        "share_text": r["share_text"],
+        "report": pipeline.public(r),
+    }
+
+
 def sample_result():
     """The recorded Birim run, rendered offline, so the page opens on a real result and not empty boxes.
 
@@ -209,12 +68,7 @@ def sample_result():
     """
     r = demo.run(demo.SPOT["lat"], demo.SPOT["lon"], name=demo.SPOT["name"],
                  out_dir=os.path.join(demo.OUT_DIR, "sample"), log=lambda *a: None)
-    return {
-        "card_png": r["card_png"],
-        "share_text": r["share_text"],
-        "share_html": _share_html(card.whatsapp_url(r["share_text"])),
-        "report": pipeline.public(r),
-    }
+    return sections(r)
 
 
 def _resolve(spot, lat, lon):
@@ -225,41 +79,45 @@ def _resolve(spot, lat, lon):
             return float(lat), float(lon), spot.split(" (")[0]
     if lat is None or lon is None:
         return None
-    return float(lat), float(lon), "Custom point"
+    return float(lat), float(lon), "Your spot"
 
 
-def _run(spot, lat, lon, clip):
-    logs = []
-    def log(*a):
-        logs.append(" ".join(map(str, a)))
-    try:
-        point = _resolve(spot, lat, lon)
-        if point is None:
-            raise ValueError("Type both coordinates for a custom point, or pick a spot from the list.")
-        lat_f, lon_f, name = point
-        credit = HERO_CREDIT if clip else None
-        r = pipeline.run(lat_f, lon_f, name=name, clip=clip, clip_credit=credit, log=log)
-        wa = card.whatsapp_url(r["share_text"])
-        return r["card_png"], r["share_text"], "\n".join(logs), pipeline.public(r), _share_html(wa), r["card_png"]
-    except Exception as ex:
-        log(f"Something failed: {type(ex).__name__}: {ex}")
-        log("Offline? Set DEMO_MODE=1 (or just unset MODEL_API_KEY) to see the demo result.")
-        return None, "", "\n".join(logs), {}, "", None
+def run_live(spot, lat, lon, clip):
+    """Run a check in a thread and yield (readout HTML, log text, sections or None) as the log grows.
 
+    The last yield carries the sections when the check worked, or None when it failed.
+    """
+    lines, q, box = [], queue.Queue(), {}
+    point = _resolve(spot, lat, lon)
+    if point is None:
+        fix = "We need a place to check. Tap \"I'm at the river now\", pick a spot, or type both coordinates."
+        lines.append("Something failed: no coordinates. " + fix)
+        yield readout.html(lines, finished=True, failed=True, reason=fix), "\n".join(lines), None
+        return
+    lat_f, lon_f, name = point
 
-def _share_html(wa_url):
-    """Two big tap targets: WhatsApp green share (graphite label), graphite+lime download chip."""
-    if not wa_url:
-        return ""
-    style = ("display:inline-flex;align-items:center;gap:8px;padding:14px 22px;border-radius:12px;"
-             "font-weight:700;font-size:1.02rem;margin:8px 10px 8px 0;")
-    wa_style = f"{style}background:{WA};color:{GRAPHITE};border:none;text-decoration:none;"
-    dl_style = f"{style}background:{GRAPHITE};color:{LIME};border:1.5px solid {GRAPHITE};"
-    return (f'<div class="share-row">'
-            f'<a href="{wa_url}" target="_blank" rel="noopener" '
-            f'style="{wa_style}">Share on WhatsApp</a>'
-            f'<span style="{dl_style}">Download the card</span>'
-            f'</div>')
+    def work():
+        try:
+            box["r"] = pipeline.run(lat_f, lon_f, name=name, clip=clip,
+                                    clip_credit=HERO_CREDIT if clip else None,
+                                    log=lambda *a: q.put(" ".join(map(str, a))))
+        except Exception as ex:
+            box["error"] = f"Something failed: {type(ex).__name__}: {ex}"
+
+    t0, worker = time.time(), threading.Thread(target=work, daemon=True)
+    worker.start()
+    while worker.is_alive() or not q.empty():
+        try:
+            lines.append(q.get(timeout=0.5))
+        except queue.Empty:
+            continue
+        yield readout.html(lines, finished=False), "\n".join(lines), None
+    if "error" in box:
+        lines += [box["error"], "Offline? Set DEMO_MODE=1 (or unset MODEL_API_KEY) to see the demo result."]
+        yield readout.html(lines, finished=True, failed=True), "\n".join(lines), None
+        return
+    yield (readout.html(lines, finished=True, elapsed_s=time.time() - t0), "\n".join(lines),
+           sections(box["r"]))
 
 
 def _chip_html():
@@ -275,108 +133,140 @@ def _chip_html():
     muse = meta.get("muse_quote") or (r.get("ground") or {}).get("label")
     if muse:
         chips.append(f'<span class="chip">Muse Spark: &ldquo;{muse}&rdquo;</span>')
-    if not chips:
-        return ""
-    return '<div class="chip-row">' + "".join(chips) + "</div>"
+    return '<div class="chip-row">' + "".join(chips) + "</div>" if chips else ""
 
 
 def _hero_html():
-    with open(os.path.join(ASSETS, "bridge_brand.jpg"), "rb") as f:
-        hero_b64 = base64.b64encode(f.read()).decode()
+    """Thesis, the three things a citizen does, safety up front, and the machine eye on a real river."""
+    photo = case_file.data_uri(os.path.join(ASSETS, "bridge.jpg"), max_side=900)
+    reticle = ('<svg class="reticle" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="50" '
+               'fill="none" stroke="#D4FF3A" stroke-width="2"/><g stroke="#D4FF3A" stroke-width="2">'
+               '<line x1="60" y1="4" x2="60" y2="16"/><line x1="60" y1="104" x2="60" y2="116"/>'
+               '<line x1="4" y1="60" x2="16" y2="60"/><line x1="104" y1="60" x2="116" y2="60"/></g></svg>')
     return (
-        '<div class="hero">'
-        '<div>'
-        f'<div class="hero-mark">{_EYES_MARK}</div>'
-        '<h1>Two Eyes</h1>'
-        '<div class="tagline">Film the river. <i>Find the source.</i></div>'
-        '<div class="sub">Your phone sees the muddy river. The satellite sees the scar upstream.</div>'
-        '<div class="small">Film a muddy river from a bridge, riverbank or landing. We trace the river upstream for new '
-        'forest clearings in Sentinel-2 imagery — often galamsey — cross-check them against independent '
-        'datasets, and return a dated, anonymous evidence card you can share on WhatsApp. '
-        'SAM 3.1 (Meta Model API) + Sentinel-2 (Earth Engine).</div>'
-        '</div>'
-        '<div>'
-        f'<img class="hero-img" src="data:image/jpeg;base64,{hero_b64}" alt="Bridge over a brown river">'
-        f'<div class="hero-cap">{HERO_CREDIT}</div>'
-        '</div>'
-        '</div>'
-    )
+        '<div class="hero"><div>'
+        '<h1>Film the river. <em>Find the source.</em></h1>'
+        '<p class="lede">Your phone sees the muddy river. The satellite sees where the mud comes from.</p>'
+        '<ol class="steps">'
+        '<li><span><b>Find a safe, public spot by the river</b><small>A bridge, a riverbank, a ferry landing '
+        'or a footpath crossing.</small></span></li>'
+        '<li><span><b>Film the water for 10 seconds</b><small>Optional, but it makes the card stronger.</small></span></li>'
+        '<li><span><b>Share the evidence card</b><small>We look upstream from space and write it up for '
+        'you.</small></span></li></ol>'
+        '<div class="safe"><span>Public places only</span><span>Your location is rounded to 1 km</span>'
+        '<span>No name or number kept</span></div></div>'
+        f'<div class="photo-col"><div class="photo"><img src="{photo}" alt="Aerial view of a bridge over a '
+        f'brown river through forest">{reticle}<span class="tag">Water · muddy</span>'
+        f'<span class="cap">{HERO_CREDIT}</span></div></div></div>')
+
+
+_GUIDE = ('<div class="field-label"><span class="num">2</span>Film the water <span class="hint">(optional)'
+          '</span></div><div class="guide"><div class="phone" aria-hidden="true"><i></i></div><ul>'
+          '<li>From a bridge, point down at the water</li>'
+          '<li>From the bank, aim across at open water, not the muddy edge</li>'
+          '<li>Keep still for about 10 seconds, in daylight</li>'
+          '<li>Stay somewhere public. Never walk up to a mine</li></ul></div>')
+
+_FOOTER = ('<div id="footnote">Safety: film only from public places, never at mining sites. Clips are re-encoded '
+           'with GPS metadata stripped; your spot is shown only to about 1 km; no personal data is kept.<br>'
+           f'Imagery: {HERO_CREDIT}. Satellite: Contains modified Copernicus Sentinel data 2023, 2026. '
+           'Sources: Sentinel-2 (ESA/Copernicus), HydroBASINS (WWF), RADD (WUR/GFW), Hansen GFC (UMD), '
+           'WDPA (UNEP-WCMC), JRC water. Built with Meta SAM 3.1 and Muse Spark.</div>')
+
+
+def _head(title, right=""):
+    return f'<div class="section-head"><h2>{title}</h2>{right}</div>'
 
 
 def launch(share=False, warm=True):
-    import threading
     import gradio as gr
+
+    sample = sample_result()
 
     def _fill(spot):
         """Spot picks fill the coordinate boxes; 'Custom point' leaves them as typed and shows them."""
         coords, custom = spot_pick(spot)
         if coords:
             return coords[0], coords[1], gr.update(visible=custom)
-        keep = gr.skip() if hasattr(gr, "skip") else gr.update()
-        return keep, keep, gr.update(visible=custom)
+        return gr.skip(), gr.skip(), gr.update(visible=custom)
 
-    def _begin():
-        """Clear the sample as soon as a run starts, so progress never sits on top of a stale card."""
-        return gr.update(visible=False), None, "", "", None
-
-    scroll_to_results = ("() => { const el = document.getElementById('col-outputs'); "
-                         "if (el) el.scrollIntoView({behavior: 'smooth', block: 'start'}); }")
-    sample = sample_result()
-
-    def _warm_safe(spots):
-        try:
-            pipeline.warm(spots, log=lambda *a: None)
-        except Exception as ex:
-            print(f"[two_eyes] warm skipped: {type(ex).__name__}: {ex}")
+    def _go(spot, lat, lon, clip):
+        """Stream the readout, then fill the case file. The sample tag goes as soon as a run starts."""
+        for html, log_text, s in run_live(spot, lat, lon, clip):
+            out = {sample_tag: gr.update(visible=False), readout_box: html, log: log_text}
+            if s:
+                out.update({verdict: s["verdict"], trace: s["trace"], eyes: s["eyes"], preview: s["preview"],
+                            share_box: s["share_html"], txt: s["share_text"], card_file: s["card_png"],
+                            report: s["report"], results: gr.update(visible=True)})
+            else:
+                out[results] = gr.update(visible=False)
+            yield out
 
     if warm:
-        threading.Thread(target=_warm_safe, args=(list(DEMO_SPOTS.values()),), daemon=True).start()
+        threading.Thread(target=lambda: _quiet_warm(list(DEMO_SPOTS.values())), daemon=True).start()
 
-    banner = ''
+    banner = ""
     if demo.is_demo_mode():
-        banner = ('<div id="demo-banner"><span class="mono">Demo mode</span><br>'
-                  'Cached Birim N4 bridge result from the recorded run of 28 Oct 2026. '
-                  'No Earth Engine and no Meta API calls are made.</div><div style="height:16px"></div>')
-    banner += _chip_html()
+        banner = ('<div id="demo-banner"><span class="mono">Demo mode</span><br>Every check shows the recorded '
+                  'Birim N4 bridge result of 28 Oct 2026. No Earth Engine and no Meta API calls are made.</div>')
 
-    theme = gr.themes.Base(primary_hue="neutral", neutral_hue="neutral")   # page look is set by CSS below
-    with gr.Blocks(title="Two Eyes — check upstream") as ui:
-        gr.HTML(_hero_html() + banner)
-        with gr.Row(elem_id="row-main"):
-            with gr.Column(elem_id="col-controls"):
-                gr.HTML('<div class="section-head">Check a river</div>', elem_classes=["plain"])
-                spot = gr.Dropdown(list(DEMO_SPOTS) + ["Custom point"],
-                                   value=list(DEMO_SPOTS)[0], label="Where you filmed")
+    theme = gr.themes.Base(primary_hue="neutral", neutral_hue="neutral")   # page look is set by CSS
+    with gr.Blocks(title="Two Eyes: check upstream") as ui:
+        gr.HTML(_hero_html() + banner + _chip_html(), elem_classes=["plain"])
+        gr.HTML(_head("Check a river", '<span class="mono">Takes about a minute</span>'), elem_classes=["plain"])
+        with gr.Row(elem_id="row-input", equal_height=False):
+            with gr.Column():
+                gr.HTML('<div class="field-label"><span class="num">1</span>Where are you?</div>',
+                        elem_classes=["plain"])
+                locate = gr.Button("◎  I'm at the river now", elem_id="locate")
+                spot = gr.Dropdown([(k.split(" (")[0], k) for k in DEMO_SPOTS] +
+                                   [("Somewhere else (type coordinates)", CUSTOM)],
+                                   value=list(DEMO_SPOTS)[0], label="Or pick a spot people have checked")
                 with gr.Group(visible=False, elem_id="custom-fields") as custom_fields:
                     lat = gr.Number(label="Latitude", value=6.28442)
                     lon = gr.Number(label="Longitude", value=-0.46118)
-                clip = gr.Video(label="Clip of the river (optional, ~10 s)")
-                go = gr.Button("Check upstream", variant="primary")
-            with gr.Column(elem_id="col-outputs"):
-                gr.HTML('<div class="section-head">Case file</div>', elem_classes=["plain"])
-                sample_tag = gr.HTML(f'<span class="sample-tag">Sample: recorded run, '
-                                     f'{demo.SPOT["name"]}, 28 Oct 2026</span>', elem_classes=["plain"])
-                img = gr.Image(value=sample["card_png"], label="Evidence card", type="filepath")
-                txt = gr.Textbox(value=sample["share_text"], label="WhatsApp message", lines=4)
-                share = gr.HTML(value=sample["share_html"], label="Share")
-                card_file = gr.File(value=sample["card_png"], label="Download evidence card")
-                with gr.Accordion("How the checks ran", open=False):
-                    log = gr.Textbox(label="What the checks did", lines=8)
-                    js = gr.JSON(value=sample["report"], label="Full report")
-        footer = ('<div id="footnote">Safety: film only from public places, never at mining sites. '
-                  'Clips are re-encoded with GPS metadata stripped; locations on the card are rounded to '
-                  'about 1 km; no personal data is kept.<br>'
-                  'Imagery: bridge photo — Photo: Goldenwabbit, Wikimedia Commons, CC BY-SA 4.0. '
-                  'Satellite: Contains modified Copernicus Sentinel data 2023, 2026. '
-                  'Sources: Sentinel-2 (ESA/Copernicus), HydroBASINS (WWF), RADD (WUR/GFW), '
-                  'Hansen GFC (UMD), WDPA (UNEP-WCMC), JRC water.</div>')
-        gr.HTML(footer)
-        go.click(_begin, None, [sample_tag, img, txt, share, card_file]).then(
-            None, None, None, js=scroll_to_results).then(
-            _run, [spot, lat, lon, clip], [img, txt, log, js, share, card_file])
+            with gr.Column():
+                gr.HTML(_GUIDE, elem_classes=["plain"])
+                clip = gr.Video(label="Your clip of the river", sources=["upload", "webcam"])
+        go = gr.Button("Check upstream", variant="primary")
+        readout_box = gr.HTML("", elem_id="readout", elem_classes=["plain"])   # empty until a check runs
+
+        gr.HTML(_head("What we found"), elem_classes=["plain"])
+        sample_tag = gr.HTML(f'<span class="sample-tag">Sample: recorded run, {demo.SPOT["name"]}, '
+                             '28 Oct 2026</span>', elem_classes=["plain"])
+        with gr.Column(visible=True) as results:
+            verdict = gr.HTML(sample["verdict"], elem_classes=["plain"])
+            trace = gr.HTML(sample["trace"], elem_classes=["plain"])
+            eyes = gr.HTML(sample["eyes"], elem_classes=["plain"])
+            gr.HTML(_head("Share it"), elem_classes=["plain"])
+            with gr.Row(elem_id="row-share", equal_height=False):
+                preview = gr.HTML(sample["preview"], elem_classes=["plain"])
+                with gr.Column():
+                    share_box = gr.HTML(sample["share_html"], elem_classes=["plain"])
+                    card_file = gr.DownloadButton("Save the card", value=sample["card_png"])
+                    txt = gr.Textbox(sample["share_text"], label="Message (edit before you send)", lines=4,
+                                     buttons=["copy"])
+                    gr.HTML(share_ui.next_steps_html(), elem_classes=["plain"])
+        with gr.Accordion("How the checks ran", open=False):
+            log = gr.Textbox(label="What the checks did", lines=8)
+            report = gr.JSON(sample["report"], label="Full report")
+        gr.HTML(_FOOTER, elem_classes=["plain"])
+
         spot.change(_fill, [spot], [lat, lon, custom_fields])
+        locate.click(None, None, [lat, lon], js=LOCATE_JS).then(lambda: CUSTOM, None, spot)
+        go.click(None, None, None, js=SCROLL_JS).then(
+            _go, [spot, lat, lon, clip],
+            [sample_tag, readout_box, log, verdict, trace, eyes, preview, share_box, txt, card_file, report, results])
     # Gradio 6: css and theme live in launch(), not Blocks
-    ui.launch(share=share, debug=False, css=build_css(), theme=theme)
+    ui.launch(share=share, debug=False, css=build_css(), theme=theme, js=LIGHT_JS)
+
+
+def _quiet_warm(spots):
+    """Pre-compute the demo spots in the background; a failure only means the first run is slower."""
+    try:
+        pipeline.warm(spots, log=lambda *a: None)
+    except Exception as ex:
+        print(f"[two_eyes] warm skipped: {type(ex).__name__}: {ex}")
 
 
 if __name__ == "__main__":

@@ -43,6 +43,12 @@ def test_demo_credit_and_recorded_run_date():
     assert "Copernicus" in r["credit_sat"] and "2023" in r["credit_sat"] and "2026" in r["credit_sat"]
 
 
+def test_demo_ground_has_raw_frame_painted_still_and_colour():
+    g = demo.demo_report()["ground"]
+    assert g["frame"].shape[2] == 3 and g["still"].shape[2] == 3
+    assert len(g["rgb"]) == 3 and g["rgb"][0] > g["rgb"][2]       # brown: more red than blue
+
+
 def test_demo_sam_boxes_are_labelled_illustrative():
     r = demo.demo_report()
     assert r["scar"]["boxes_illustrative"] is True
@@ -125,11 +131,11 @@ def test_whatsapp_url_built_offline():
     assert unquote(u.split("=", 1)[1]) == "Forest cleared upstream. This doesn't mean the water is safe."
 
 
-def test_share_html_block():
-    from two_eyes import app
-    html = app._share_html(card.whatsapp_url("hi"))
-    assert "wa.me" in html and "Download" in html
-    assert app._share_html("") == ""
+def test_share_buttons_link_to_whatsapp_and_promise_no_identity():
+    from two_eyes import share
+    html = share.buttons_html("hi")
+    assert "wa.me" in html and "no name" in html
+    assert share.buttons_html("") == ""
 
 
 def test_app_chip_texts():
@@ -147,6 +153,25 @@ def test_picking_a_known_spot_fills_its_coordinates_and_hides_the_custom_fields(
 def test_picking_custom_point_keeps_typed_coordinates_and_shows_the_fields():
     from two_eyes import app
     assert app.spot_pick("Custom point") == (None, True)
+
+
+def test_a_check_streams_progress_then_the_case_file(tmp_path, monkeypatch):
+    from two_eyes import app
+    monkeypatch.setenv("DEMO_MODE", "1")
+    monkeypatch.chdir(tmp_path)
+    name = list(app.DEMO_SPOTS)[0]
+    steps = list(app.run_live(name, *app.DEMO_SPOTS[name], None))
+    readout_html, log_text, s = steps[-1]
+    assert "Done" in readout_html and "Demo mode" in log_text
+    assert s and "football pitches" in s["verdict"] and "wa.me" in s["share_html"]
+    assert all(step[2] is None for step in steps[:-1])
+
+
+def test_a_check_without_coordinates_says_what_to_do():
+    from two_eyes import app
+    (readout_html, log_text, s), = list(app.run_live(app.CUSTOM, None, None, None))
+    assert s is None and "didn't finish" in readout_html and "coordinates" in log_text
+    assert "type both coordinates" in readout_html and "our side" not in readout_html
 
 
 def test_dropdown_label_is_readable_on_bone():
