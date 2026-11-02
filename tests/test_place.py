@@ -24,6 +24,12 @@ def test_public_report_keeps_the_clearing_precise_so_officials_can_find_it():
     assert (scar["lat"], scar["lon"]) == (6.45441, -0.48332)
 
 
+def test_public_report_rounds_the_distance_so_it_cannot_pin_down_the_spot():
+    r = _report()
+    r["scar"]["distance_km"] = 19.04
+    assert pipeline.public(r)["scar"]["distance_km"] == 19
+
+
 def test_public_report_does_not_change_the_report_it_was_given():
     r = _report()
     pipeline.public(r)

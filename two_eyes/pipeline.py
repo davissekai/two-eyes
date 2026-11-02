@@ -233,7 +233,9 @@ def _json_default(o):
 def public(r):
     """Report without image arrays, and with the filming spot rounded to about 1 km (for JSON / sharing).
 
-    The clearing keeps its full precision: that is the evidence officials need to find it.
+    The clearing keeps its full precision: that is the evidence officials need to find it. Its distance
+    from the spot is rounded to whole km, since a precise distance from a precise clearing would draw a
+    thin arc through the 1 km square and give the spot back.
     """
     def strip(x):
         if isinstance(x, dict):
@@ -245,4 +247,7 @@ def public(r):
     spot = out.get("spot")
     if spot and spot.get("lat") is not None and spot.get("lon") is not None:
         spot["lat"], spot["lon"] = card.public_point(spot["lat"], spot["lon"])
+    scar = out.get("scar")
+    if scar and scar.get("distance_km") is not None:
+        scar["distance_km"] = round(scar["distance_km"])
     return out
