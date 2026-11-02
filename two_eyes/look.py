@@ -156,6 +156,8 @@ _PAGE = """
 .numbers div {border-top:1.5px solid GRAPHITE; padding-top:8px; min-width:0;}
 .numbers b {display:block; font:400 clamp(34px,4.6vw,50px)/1 IS,serif; font-variant-numeric:tabular-nums;}
 .numbers span {font-size:13px; color:LATERITE;}
+.verdict .caution {margin:16px 0 0; border-left:2px solid LATERITE; background:PANEL2; border-radius:0 8px 8px 0;
+  padding:8px 10px; font-size:14px;}
 .ladder {display:grid; gap:12px;}
 .rungs {display:grid; grid-template-columns:repeat(4,1fr); gap:6px;}
 .rung {border:1px solid RULER; border-radius:10px; padding:9px; font-size:13.5px; min-height:64px; display:grid;

@@ -105,8 +105,19 @@ def verdict_html(r):
             f'<p class="next">{html.escape(next_step(r))}</p>'
             '<p class="hint">Only the authorities can say it is illegal. We give you evidence, not a verdict.</p>'
             '</div>')
-    return (f'<div class="verdict"><div class="panel"><h3>{_verdict_title(r)}</h3>{numbers}</div>'
+    return (f'<div class="verdict"><div class="panel"><h3>{_verdict_title(r)}</h3>{numbers}{_confluence_note(r)}</div>'
             f'{"<div class=panel>" + ladder + "</div>" if ladder else ""}</div>')
+
+
+def _confluence_note(r):
+    """When two rivers meet at the spot, say which one we followed and how to check the other."""
+    sn = r.get("snap") or {}
+    if not sn.get("ambiguous"):
+        return ""
+    chosen = next((o["kind"] for o in sn.get("options", []) if o["reach"] == sn.get("reach")), "nearest river")
+    other = "bigger river" if chosen == "smaller stream" else "smaller stream"
+    return (f'<p class="next caution">Two rivers meet near where you stood. We followed the {chosen}, the '
+            f'one closest to you. If you filmed the {other}, walk a little way along it and check again.</p>')
 
 
 def _state(v):

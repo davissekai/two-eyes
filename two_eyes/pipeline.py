@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 
 from . import config as C
-from . import card, checks, demo, sky
+from . import card, checks, demo, sky, snap
 from .trace import Basins, check_b
 
 
@@ -53,7 +53,7 @@ def _inside(prev, lat, lon):
 
 
 CACHE_DIR = os.environ.get("TWO_EYES_CACHE", os.path.expanduser("~/.two_eyes_cache"))
-CACHE_VERSION = "v3"   # bump when the sky pipeline changes
+CACHE_VERSION = "v4"   # bump when the sky pipeline changes
 
 
 def _cache_key(lat, lon, focus):
@@ -62,14 +62,32 @@ def _cache_key(lat, lon, focus):
     return os.path.join(CACHE_DIR, hashlib.sha1(k.encode()).hexdigest()[:16] + ".pkl")
 
 
+def river_point(lat, lon, log=print):
+    """Where the trace starts: the spot snapped onto the nearest mapped river, or the spot itself.
+
+    A failed lookup never stops a check; it only means the trace starts from the phone's position.
+    """
+    try:
+        s = snap.snap_to_river(lat, lon)
+    except Exception as ex:
+        log(f"River snap skipped: {type(ex).__name__}")
+        return lat, lon, {"moved_m": 0, "ambiguous": False, "error": type(ex).__name__}
+    if s is None:
+        return lat, lon, {"moved_m": 0, "ambiguous": False, "note": "no mapped river within %d m" % C.SNAP_MAX_M}
+    if s["ambiguous"]:
+        log("Two rivers meet near the filming spot; following the nearest one.")
+    return s["lat"], s["lon"], s
+
+
 def sky_part(lat, lon, focus=None, use_sam=True, log=print, timings=None):
     """Everything that depends only on the place and the fixed dates (checks A-F). Cacheable."""
     t = timings if timings is not None else {}
     clock = time.time()
     r = {"checks": {}, "candidates": []}
     log("Tracing the catchment above the filming spot (HydroBASINS level 12)...")
-    basins = Basins(lat, lon)
-    bb = basins.basin_of(lat, lon)
+    rlat, rlon, r["snap"] = river_point(lat, lon, log=log)
+    basins = Basins(rlat, rlon)
+    bb = basins.basin_of(rlat, rlon)
     ids, searched, total = nearest_upstream(basins, bb)
     r["catchment"] = {"spot_basin": bb, "basins_searched": len(ids), "km2_searched": round(searched),
                       "km2_upstream_total": round(total)}
@@ -247,6 +265,10 @@ def public(r):
     spot = out.get("spot")
     if spot and spot.get("lat") is not None and spot.get("lon") is not None:
         spot["lat"], spot["lon"] = card.public_point(spot["lat"], spot["lon"])
+    sn = out.get("snap") or {}
+    for p in [sn] + list(sn.get("options") or []):
+        if p.get("lat") is not None and p.get("lon") is not None:     # snapped points sit metres from the spot
+            p["lat"], p["lon"] = card.public_point(p["lat"], p["lon"])
     scar = out.get("scar")
     if scar and scar.get("distance_km") is not None:
         scar["distance_km"] = round(scar["distance_km"])
