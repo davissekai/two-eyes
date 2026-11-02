@@ -73,6 +73,13 @@ def test_trace_without_a_clip_says_so_instead_of_failing():
     assert clip["state"] == "skip" and "no clip" in clip["detail"].lower()
 
 
+def test_bank_shot_is_named_on_the_trace():
+    r = _r(A=True, B=True)
+    r["ground"] = {"water_found": True, "muddy": True, "label": "muddy brown", "view": "bank"}
+    clip = next(s for s in case_file.stations(r) if s["key"] == "clip")
+    assert clip["detail"] == "water looks muddy brown, filmed from the bank"
+
+
 def test_glare_clip_is_unknown_not_a_fail():
     r = _r(A=True, B=True)
     r["ground"] = {"water_found": True, "muddy": None, "label": "too bright to judge (glare)"}

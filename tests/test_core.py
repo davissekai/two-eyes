@@ -95,6 +95,33 @@ def test_muddiness_labels():
     assert ground.muddiness([blue], {})["water_found"] is False
 
 
+def test_colour_is_read_from_the_middle_of_the_water_not_the_muddy_edge():
+    # Bank shot: clear water mid-river, a band of brown shallows along the mask edge.
+    f = np.zeros((100, 100, 3), np.uint8); f[:] = (60, 100, 150)
+    m = np.zeros((100, 100), bool); m[5:95, 5:95] = True
+    edge = m & ~np.pad(np.ones((40, 40), bool), 30)
+    f[edge] = (150, 110, 60)
+    assert edge.sum() > (m & ~edge).sum()           # the shallows outnumber the open water
+    assert ground.muddiness([f], {0: m})["label"] == "clear or green"
+
+
+def test_small_water_mask_still_gets_a_reading():
+    f = np.zeros((40, 40, 3), np.uint8); f[:] = (150, 110, 60)
+    m = np.zeros((40, 40), bool); m[10:25, 10:25] = True    # 225 px: too small to trim an edge off
+    assert ground.muddiness([f], {0: m})["label"] == "muddy brown"
+
+
+def test_muse_spark_reply_is_parsed_with_the_camera_angle():
+    d = ground.parse_colour_reply('Sure! {"water": "muddy", "reason": "brown silt", "view": "bank"}')
+    assert d["label"] == "muddy brown" and d["muddy"] is True and d["view"] == "bank"
+
+
+def test_unusable_muse_spark_reply_is_ignored():
+    assert ground.parse_colour_reply("no json here") is None
+    assert ground.parse_colour_reply('{"water": "purple"}') is None
+    assert ground.parse_colour_reply('{"water": "clear"}')["view"] == "unknown"
+
+
 def test_muddiness_reports_the_water_colour_for_the_swatch():
     brown = np.zeros((40, 40, 3), np.uint8); brown[:] = (150, 110, 60)
     brown[:5] = (250, 250, 250)                       # bright bank outside the mask

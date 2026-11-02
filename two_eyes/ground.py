@@ -44,13 +44,26 @@ def lab_l(rgb_pixels):
     return lab[:, 0].astype(np.float32) * 100 / 255
 
 
+def core(mask, min_px=200):
+    """The middle of the water: pixels more than half the mask's depth from its edge.
+
+    From a riverbank the edge of the mask is shallows, wet mud and reflections, browner than the
+    river itself, so the colour is read away from it. Small masks are used whole.
+    """
+    from scipy.ndimage import distance_transform_edt
+    d = distance_transform_edt(mask)
+    inner = d > 0.5 * d.max()
+    return inner if inner.sum() >= min_px else mask
+
+
 def muddiness(frames, masks):
-    """Median CIELAB of water pixels across frames, a rough colour label (fallback when no VLM), and
-    the median RGB of the water, which the page shows as a colour swatch."""
+    """Median CIELAB of the middle of the water across frames, a rough colour label (fallback when no
+    VLM), and the median RGB of that water, which the page shows as a colour swatch."""
     bs, ls, rgbs = [], [], []
     for i, f in enumerate(frames):
         m = masks.get(i)
         if m is not None and m.shape == f.shape[:2] and m.sum() > 200:
+            m = core(m)
             bs.append(np.median(lab_b(f[m])))
             ls.append(np.median(lab_l(f[m])))
             rgbs.append(np.median(f[m], axis=0))
@@ -72,15 +85,32 @@ def muddiness(frames, masks):
 
 # Citizens film from bridges, riverbanks, ferry landings and footpaths, not only from above.
 COLOUR_QUESTION = (
-    'This is a river filmed from a bridge or a riverbank. Looking only at the river water, is it muddy '
-    '(brown/orange sediment), clear, or impossible to judge (glare, darkness)? Answer only JSON: '
-    '{"water": "muddy|clear|cannot_tell", "reason": "<12 words>"}')
+    'This is a river filmed from a bridge or a riverbank. Looking only at the open river water, not the '
+    'shallow edge, wet mud, reflections or sky glare, is it muddy (brown/orange sediment), clear, or '
+    'impossible to judge (glare, darkness)? Also say if the camera looks down from above (a bridge) or '
+    'across from the bank. Answer only JSON: {"water": "muddy|clear|cannot_tell", '
+    '"view": "above|bank|cannot_tell", "reason": "<12 words>"}')
+
+
+def parse_colour_reply(text):
+    """Muse Spark's JSON reply -> label, muddy flag, camera view, reason; None if unusable."""
+    import json
+    try:
+        d = json.loads(text[text.find("{"): text.rfind("}") + 1])
+    except ValueError:
+        return None
+    lab = {"muddy": "muddy brown", "clear": "clear", "cannot_tell": "hard to judge"}.get(d.get("water"))
+    if not lab:
+        return None
+    view = d.get("view") if d.get("view") in ("above", "bank") else "unknown"
+    return {"label": lab, "muddy": {"muddy": True, "clear": False}.get(d.get("water")), "view": view,
+            "reason": str(d.get("reason", ""))[:120], "label_source": "Muse Spark (image understanding)"}
 
 
 def judge_colour(frame, mask=None):
     """Ask Muse Spark (image understanding) what the river water looks like. Returns dict or None.
     With a mask, only the water crop is sent; without one, the whole frame (lets it run alongside SAM)."""
-    import base64, io, json
+    import base64, io
     from PIL import Image
     from .sam import client
     if mask is not None and mask.sum() > 200:
@@ -92,14 +122,7 @@ def judge_colour(frame, mask=None):
     url = "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
     resp = client().responses.create(model=C.TEXT_MODEL, input=[{"type": "message", "role": "user", "content": [
         {"type": "input_text", "text": COLOUR_QUESTION}, {"type": "input_image", "image_url": url}]}])
-    t = resp.output_text.strip()
-    t = t[t.find("{"): t.rfind("}") + 1]
-    d = json.loads(t)
-    lab = {"muddy": "muddy brown", "clear": "clear", "cannot_tell": "hard to judge"}.get(d.get("water"))
-    if not lab:
-        return None
-    return {"label": lab, "muddy": {"muddy": True, "clear": False}.get(d.get("water")),
-            "reason": str(d.get("reason", ""))[:120], "label_source": "Muse Spark (image understanding)"}
+    return parse_colour_reply(resp.output_text.strip())
 
 
 def overlay(frame, mask, color=(212, 255, 58), alpha=0.55):

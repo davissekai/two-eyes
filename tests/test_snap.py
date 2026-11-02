@@ -83,11 +83,12 @@ def test_trace_falls_back_to_the_phone_position_when_the_river_map_fails(monkeyp
     assert (lat, lon) == (LAT, LON) and info["moved_m"] == 0 and "error" in info
 
 
-def test_public_report_rounds_the_snapped_points_too():
+def test_public_report_keeps_only_what_cannot_locate_the_spot():
     from two_eyes import pipeline
     s = snap.choose([_reach(1, 60, 1600), _reach(2, 30, 40)])
     out = pipeline.public({"snap": s})["snap"]
-    assert out["lat"] == round(s["lat"], 2) and all(o["lat"] == round(o["lat"], 2) for o in out["options"])
+    assert out == {"ambiguous": True, "followed": "smaller stream", "options": ["smaller stream", "bigger river"]}
+    assert pipeline.public({"snap": {"moved_m": 0, "ambiguous": False}})["snap"] == {"ambiguous": False}
 
 
 def test_case_file_warns_when_two_rivers_meet_here():

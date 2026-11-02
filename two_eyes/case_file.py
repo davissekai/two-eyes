@@ -138,7 +138,8 @@ def stations(r):
     elif g.get("muddy") is None:
         clip = ("unknown", g.get("label") or "colour hard to judge")
     else:
-        clip = ("yes" if g["muddy"] else "no", "water looks " + (g.get("label") or "clear"))
+        clip = ("yes" if g["muddy"] else "no", "water looks " + (g.get("label") or "clear")
+                + (", filmed from the bank" if g.get("view") == "bank" else ""))
     area = f'{s["area_ha"]:.0f} ha since {C.BEFORE[0][:4]}' if s.get("area_ha") is not None else "no new clearing"
     return [
         {"key": "clip", "title": "Your clip", "state": clip[0], "detail": clip[1]},

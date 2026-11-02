@@ -248,6 +248,16 @@ def _json_default(o):
     return str(o)
 
 
+def _public_snap(sn):
+    """Only whether two rivers meet here and which kind we followed. Snapped points, reach IDs and
+    distances in metres all sit within metres of the spot, so none of them leave the report."""
+    out = {"ambiguous": bool(sn.get("ambiguous"))}
+    if out["ambiguous"]:
+        out["followed"] = next((o["kind"] for o in sn.get("options", []) if o["reach"] == sn.get("reach")), None)
+        out["options"] = [o["kind"] for o in sn.get("options", [])]
+    return out
+
+
 def public(r):
     """Report without image arrays, and with the filming spot rounded to about 1 km (for JSON / sharing).
 
@@ -265,10 +275,8 @@ def public(r):
     spot = out.get("spot")
     if spot and spot.get("lat") is not None and spot.get("lon") is not None:
         spot["lat"], spot["lon"] = card.public_point(spot["lat"], spot["lon"])
-    sn = out.get("snap") or {}
-    for p in [sn] + list(sn.get("options") or []):
-        if p.get("lat") is not None and p.get("lon") is not None:     # snapped points sit metres from the spot
-            p["lat"], p["lon"] = card.public_point(p["lat"], p["lon"])
+    if "snap" in out:
+        out["snap"] = _public_snap(out["snap"])
     scar = out.get("scar")
     if scar and scar.get("distance_km") is not None:
         scar["distance_km"] = round(scar["distance_km"])
