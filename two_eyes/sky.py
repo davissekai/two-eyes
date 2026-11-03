@@ -70,7 +70,7 @@ def _scar_image(region):
 
 
 def find_candidates(region, limit=C.MAX_CANDIDATES * 3):
-    """Candidate scar polygons in a region (e.g. the catchment above a bridge), largest first."""
+    """Candidate scar polygons in a region (e.g. the catchment above a filming spot), largest first."""
     E = ee()
     scar, b, a = _scar_image(region)
     vec = scar.reduceToVectors(geometry=region, crs=C.CRS, scale=C.SCALE_M, geometryType="polygon",

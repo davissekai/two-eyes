@@ -44,14 +44,29 @@ def lab_l(rgb_pixels):
     return lab[:, 0].astype(np.float32) * 100 / 255
 
 
+def core(mask, min_px=200):
+    """The middle of the water: pixels more than half the mask's depth from its edge.
+
+    From a riverbank the edge of the mask is shallows, wet mud and reflections, browner than the
+    river itself, so the colour is read away from it. Small masks are used whole.
+    """
+    from scipy.ndimage import distance_transform_edt
+    d = distance_transform_edt(mask)
+    inner = d > 0.5 * d.max()
+    return inner if inner.sum() >= min_px else mask
+
+
 def muddiness(frames, masks):
-    """Median CIELAB of water pixels across frames, and a rough colour label (fallback when no VLM)."""
-    bs, ls = [], []
+    """Median CIELAB of the middle of the water across frames, a rough colour label (fallback when no
+    VLM), and the median RGB of that water, which the page shows as a colour swatch."""
+    bs, ls, rgbs = [], [], []
     for i, f in enumerate(frames):
         m = masks.get(i)
         if m is not None and m.shape == f.shape[:2] and m.sum() > 200:
+            m = core(m)
             bs.append(np.median(lab_b(f[m])))
             ls.append(np.median(lab_l(f[m])))
+            rgbs.append(np.median(f[m], axis=0))
     if not bs:
         return {"water_found": False, "label": "no water found", "b_star": None, "frames_used": 0}
     b, L = float(np.median(bs)), float(np.median(ls))
@@ -64,13 +79,38 @@ def muddiness(frames, masks):
     else:
         label, muddy = "somewhat cloudy", None
     return {"water_found": True, "b_star": round(b, 1), "L_star": round(L, 1), "label": label,
-            "frames_used": len(bs), "muddy": muddy, "label_source": "colour rule"}
+            "frames_used": len(bs), "muddy": muddy, "label_source": "colour rule",
+            "rgb": [int(round(v)) for v in np.median(rgbs, axis=0)]}
+
+
+# Citizens film from bridges, riverbanks, ferry landings and footpaths, not only from above.
+COLOUR_QUESTION = (
+    'This is a river filmed from a bridge or a riverbank. Looking only at the open river water, not the '
+    'shallow edge, wet mud, reflections or sky glare, is it muddy (brown/orange sediment), clear, or '
+    'impossible to judge (glare, darkness)? Also say if the camera looks down from above (a bridge) or '
+    'across from the bank. Answer only JSON: {"water": "muddy|clear|cannot_tell", '
+    '"view": "above|bank|cannot_tell", "reason": "<12 words>"}')
+
+
+def parse_colour_reply(text):
+    """Muse Spark's JSON reply -> label, muddy flag, camera view, reason; None if unusable."""
+    import json
+    try:
+        d = json.loads(text[text.find("{"): text.rfind("}") + 1])
+    except ValueError:
+        return None
+    lab = {"muddy": "muddy brown", "clear": "clear", "cannot_tell": "hard to judge"}.get(d.get("water"))
+    if not lab:
+        return None
+    view = d.get("view") if d.get("view") in ("above", "bank") else "unknown"
+    return {"label": lab, "muddy": {"muddy": True, "clear": False}.get(d.get("water")), "view": view,
+            "reason": str(d.get("reason", ""))[:120], "label_source": "Muse Spark (image understanding)"}
 
 
 def judge_colour(frame, mask=None):
     """Ask Muse Spark (image understanding) what the river water looks like. Returns dict or None.
     With a mask, only the water crop is sent; without one, the whole frame (lets it run alongside SAM)."""
-    import base64, io, json
+    import base64, io
     from PIL import Image
     from .sam import client
     if mask is not None and mask.sum() > 200:
@@ -80,22 +120,12 @@ def judge_colour(frame, mask=None):
         crop = frame
     buf = io.BytesIO(); Image.fromarray(crop).save(buf, format="JPEG", quality=85)
     url = "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
-    q = ('This is a river seen from a bridge. Looking only at the river water, is it muddy (brown/orange sediment), clear, or '
-         'impossible to judge (glare, darkness)? Answer only JSON: {"water": "muddy|clear|cannot_tell", '
-         '"reason": "<12 words>"}')
     resp = client().responses.create(model=C.TEXT_MODEL, input=[{"type": "message", "role": "user", "content": [
-        {"type": "input_text", "text": q}, {"type": "input_image", "image_url": url}]}])
-    t = resp.output_text.strip()
-    t = t[t.find("{"): t.rfind("}") + 1]
-    d = json.loads(t)
-    lab = {"muddy": "muddy brown", "clear": "clear", "cannot_tell": "hard to judge"}.get(d.get("water"))
-    if not lab:
-        return None
-    return {"label": lab, "muddy": {"muddy": True, "clear": False}.get(d.get("water")),
-            "reason": str(d.get("reason", ""))[:120], "label_source": "Muse Spark (image understanding)"}
+        {"type": "input_text", "text": COLOUR_QUESTION}, {"type": "input_image", "image_url": url}]}])
+    return parse_colour_reply(resp.output_text.strip())
 
 
-def overlay(frame, mask, color=(255, 120, 0), alpha=0.45):
+def overlay(frame, mask, color=(212, 255, 58), alpha=0.55):
     out = frame.astype(np.float32).copy()
     out[mask] = out[mask] * (1 - alpha) + np.array(color, np.float32) * alpha
     return out.astype(np.uint8)
@@ -126,6 +156,7 @@ def analyse_clip(src, use_sam=True, use_vlm=True):
                 res["vlm_error"] = type(e).__name__
     best = max(masks, key=lambda k: masks[k].sum()) if masks else len(frames) // 2
     best = min(best, len(frames) - 1)
-    res.update(method=method, n_frames=len(frames),
+    # frame: what the citizen filmed; still: the same frame with the measured water painted lime.
+    res.update(method=method, n_frames=len(frames), frame=frames[best],
                still=overlay(frames[best], masks[best]) if best in masks else frames[best])
     return res
