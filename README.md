@@ -76,6 +76,20 @@ from two_eyes.app import launch; launch()   # simple web UI with a public link
 
 Tests: `pytest tests` (pure-Python parts; no Earth Engine needed).
 
+## Run the phone app
+
+An installable web app: one screen at a time (where you are, film the water, the live check, the result,
+share). Phones add it to the home screen and open it full-screen.
+
+```bash
+pip install -e ".[web]"
+python -m two_eyes.web                     # demo result, no keys needed
+EE_PROJECT=<your-ee-project> MODEL_API_KEY=... python -m two_eyes.web   # live
+```
+
+It serves on http://127.0.0.1:8000. Phones only allow GPS and the camera over https, so to use it on a
+phone, put it behind an https tunnel or host.
+
 ## Safety
 
 Film only from public places, never at mining sites. Clips are re-encoded with metadata (GPS) stripped,

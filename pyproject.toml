@@ -12,10 +12,12 @@ dependencies = ["earthengine-api", "numpy", "scipy", "pyproj", "pillow", "matplo
 
 [project.optional-dependencies]
 app = ["gradio"]
+web = ["fastapi", "uvicorn", "python-multipart"]
 dev = ["pytest"]
 
 [tool.setuptools]
-packages = ["two_eyes"]
+packages = ["two_eyes", "two_eyes.web"]
 
 [tool.setuptools.package-data]
 two_eyes = ["assets/*", "assets/fonts/*", "assets/social/*"]
+"two_eyes.web" = ["static/*"]
