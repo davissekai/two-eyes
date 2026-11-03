@@ -3,6 +3,7 @@
 A check runs in a background thread; the phone polls it for the live readout, then fetches the result.
 Polling (not a stream) because phone connections drop, and a poll simply picks up where it left off.
 """
+import logging
 import os
 import shutil
 import tempfile
@@ -17,14 +18,18 @@ from fastapi.staticfiles import StaticFiles
 
 from .. import case_file, demo, pipeline, readout
 from .. import share as share_ui
-from ..app import DEMO_SPOTS, HERO_CREDIT
+from ..app import DEMO_SPOTS
 from ..look import ASSETS, page_css
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 OUT_ROOT = os.path.join(demo.OUT_DIR, "web")
 MAX_CLIP_BYTES = 80 * 1024 * 1024     # a 10 s phone clip is well under this
 MAX_JOBS = 50                         # finished checks kept in memory; the oldest are dropped
+MAX_RUNNING = 3                       # checks at once; each one calls Earth Engine and the paid models
 FAIL_REASON = "Something went wrong on our side. Check your connection and try again."
+BUSY = "Two Eyes is busy with other checks. Try again in a minute."
+
+log = logging.getLogger("two_eyes.web")
 
 JOBS = {}
 _LOCK = threading.Lock()
@@ -52,12 +57,13 @@ def _work(job_id, lat, lon, name, clip):
     """Run one check, feeding its log into the job so polls can show progress."""
     job = JOBS[job_id]
     try:
-        r = pipeline.run(lat, lon, name=name, clip=clip, clip_credit=HERO_CREDIT if clip else None,
+        # The clip is the person's own footage, so it carries no photo credit.
+        r = pipeline.run(lat, lon, name=name, clip=clip, clip_credit=None,
                          out_dir=os.path.join(OUT_ROOT, job_id), log=lambda *a: job["lines"].append(" ".join(map(str, a))))
         job.update(card=r["card_png"], result=_result(job_id, r), state="done")
     except Exception as ex:
         # The type goes to the server log for us; the person sees a plain reason, never internals.
-        print(f"[two-eyes] check {job_id} failed: {type(ex).__name__}: {ex}")
+        log.warning("check %s failed: %s: %s", job_id, type(ex).__name__, ex)
         job["state"] = "failed"
     finally:
         job["elapsed"] = time.time() - job["t0"]
@@ -71,6 +77,10 @@ def _forget_oldest():
     for k in done[:max(0, len(JOBS) - MAX_JOBS)]:
         JOBS.pop(k, None)
         shutil.rmtree(os.path.join(OUT_ROOT, k), ignore_errors=True)
+
+
+def _running():
+    return sum(j["state"] == "running" for j in JOBS.values())
 
 
 async def _save_clip(clip):
@@ -136,9 +146,15 @@ def spots():
 @app.post("/api/checks")
 async def start_check(lat: float = Form(..., ge=-90, le=90), lon: float = Form(..., ge=-180, le=180),
                       name: str = Form("", max_length=80), clip: Optional[UploadFile] = File(None)):
+    if _running() >= MAX_RUNNING:
+        raise HTTPException(429, BUSY)
     path = await _save_clip(clip) if clip is not None else None
     job_id = uuid.uuid4().hex
     with _LOCK:
+        if _running() >= MAX_RUNNING:
+            if path:
+                shutil.rmtree(os.path.dirname(path), ignore_errors=True)
+            raise HTTPException(429, BUSY)
         JOBS[job_id] = {"state": "running", "lines": [], "t0": time.time(), "elapsed": None,
                         "result": None, "card": None}
         _forget_oldest()

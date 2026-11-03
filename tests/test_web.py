@@ -1,6 +1,7 @@
 """The phone app's API: start a check, follow it, read the result, get the card."""
 import os
 import sys
+import threading
 import time
 
 import pytest
@@ -93,3 +94,33 @@ def test_only_known_spot_names_reach_the_card(client):
     assert server._spot_name("Birim, N4 bridge") == "Birim, N4 bridge"
     assert server._spot_name("<img src=x onerror=alert(1)>") == "Your spot"
     assert server._spot_name("") == "Your spot"
+
+
+def test_a_persons_own_clip_is_not_credited_to_anyone_else(client, monkeypatch):
+    seen = {}
+
+    def fake_run(*a, **k):
+        seen.update(k)
+        raise RuntimeError("stop here")
+    monkeypatch.setattr(server.pipeline, "run", fake_run)
+    job = client.post("/api/checks", data={"lat": 6.28, "lon": -0.46},
+                      files={"clip": ("c.mp4", b"x" * 50, "video/mp4")}).json()
+    _wait(client, job["id"])
+    assert seen["clip"] and seen["clip_credit"] is None
+
+
+def test_too_many_checks_at_once_are_turned_away(client, monkeypatch):
+    release = threading.Event()
+
+    def slow_run(*a, **k):
+        release.wait(10)
+        raise RuntimeError("done waiting")
+    monkeypatch.setattr(server.pipeline, "run", slow_run)
+    monkeypatch.setattr(server, "MAX_RUNNING", 1)
+    first = client.post("/api/checks", data={"lat": 6.28, "lon": -0.46})
+    second = client.post("/api/checks", data={"lat": 6.28, "lon": -0.46})
+    release.set()
+    assert first.status_code == 200
+    assert second.status_code == 429 and "busy" in second.json()["detail"]
+    _wait(client, first.json()["id"])
+    assert client.post("/api/checks", data={"lat": 6.28, "lon": -0.46}).status_code == 200
