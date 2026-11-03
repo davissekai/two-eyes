@@ -1,0 +1,84 @@
+{
+  "n": 8,
+  "correct": 4,
+  "hit_rate": 0.5,
+  "rows": [
+    {
+      "scar_id": "atewa_cersgis_0",
+      "label": "mining pits",
+      "pred": "unclear",
+      "confidence": "low",
+      "evidence": "Hazy low-resolution chips show indistinct orange patch without clear pits or structures.",
+      "ok": false
+    },
+    {
+      "scar_id": "atewa_cersgis_1",
+      "label": "mining pits",
+      "pred": "unclear",
+      "confidence": "low",
+      "evidence": "Cloud-hazed tan patch with no clear pits, water, or farm geometry.",
+      "ok": false
+    },
+    {
+      "scar_id": "atewa_near_0",
+      "label": "mining pits",
+      "pred": "unclear",
+      "confidence": "low",
+      "evidence": "Expanded irregular orange-brown bare clearings with no distinct water pits visible.",
+      "ok": false
+    },
+    {
+      "scar_id": "atewa_near_1",
+      "label": "mining pits",
+      "pred": "unclear",
+      "confidence": "low",
+      "evidence": "Expanded irregular orange-brown bare ground without visible water pits.",
+      "ok": false
+    },
+    {
+      "scar_id": "atewa_ctrl_forest_a",
+      "label": "unclear",
+      "pred": "unclear",
+      "confidence": "low",
+      "evidence": "Blurry low-resolution chips show indistinct patches with no clear pits or linear features.",
+      "ok": true
+    },
+    {
+      "scar_id": "atewa_ctrl_forest_b",
+      "label": "unclear",
+      "pred": "unclear",
+      "confidence": "low",
+      "evidence": "Both chips show blurry dark-green forest with no distinct features.",
+      "ok": true
+    },
+    {
+      "scar_id": "atewa_ctrl_forest_c",
+      "label": "unclear",
+      "pred": "unclear",
+      "confidence": "low",
+      "evidence": "Both chips show low-resolution green forest with no distinct pits or clearing.",
+      "ok": true
+    },
+    {
+      "scar_id": "atewa_ctrl_forest_d",
+      "label": "unclear",
+      "pred": "unclear",
+      "confidence": "low",
+      "evidence": "Both chips show only blurry dark forest with no visible clearing.",
+      "ok": true
+    }
+  ],
+  "note": "Real Atewa Earth Engine Sentinel-2 true-colour chips (SCAR_JUDGE_VERSION=1). Mining positives = CERSGIS-measured clearing components + nearby NDVI scars in the Atewa galamsey belt. Controls = intact-forest / no-scar windows (label unclear). Exact-match scoring; unclear is a valid answer. Replaces Birim stand-in 5/8 (62.5%).",
+  "site": {
+    "name": "Atewa CERSGIS + nearby",
+    "lat": 6.231388888888889,
+    "lon": -0.5672222222222222,
+    "cersgis_area_ha": 4.91,
+    "ref_ha": 5.49
+  },
+  "previous_birim": {
+    "correct": 5,
+    "n": 8,
+    "hit_rate": 0.625
+  }
+}

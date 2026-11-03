@@ -26,6 +26,9 @@ def test_share_llm_is_true():
 def test_share_text_falls_back_to_template_without_key(monkeypatch):
     monkeypatch.delenv("DEMO_MODE", raising=False)
     monkeypatch.delenv("MODEL_API_KEY", raising=False)
+    monkeypatch.setattr("two_eyes.secrets.ensure_model_api_key", lambda: False)
+    # Also block muse so a leftover env key cannot call Meta
+    monkeypatch.setattr("two_eyes.card_muse.write_card", lambda *a, **k: None)
     r = {"status": "NONE", "checks": {"A": {"pass": False}}, "scar": {}, "spot": {}}
     assert "No new forest clearing" in card.share_text(r)   # no Meta call, no crash
 
@@ -49,11 +52,12 @@ def test_demo_ground_has_raw_frame_painted_still_and_colour():
     assert len(g["rgb"]) == 3 and g["rgb"][0] > g["rgb"][2]       # brown: more red than blue
 
 
-def test_demo_sam_boxes_are_labelled_illustrative():
+def test_demo_sam_boxes_are_recorded_meta():
     r = demo.demo_report()
-    assert r["scar"]["boxes_illustrative"] is True
-    assert "not live SAM output" in r["scar"]["outline_method"]
-    assert "not SAM output" in r["ground"]["method"]
+    assert r["scar"]["boxes_illustrative"] is False
+    assert r["scar"]["boxes_recorded_meta"] is True
+    assert "recorded Meta run" in r["scar"]["outline_method"]
+    assert r["recorded_meta"] is True
 
 
 def test_demo_report_shape():
@@ -103,19 +107,20 @@ def test_pipeline_run_demo_for_non_demo_point(tmp_path, monkeypatch):
 
 def test_demo_meta_badge_and_muse_quote():
     r = demo.demo_report()
-    assert r["meta"]["sam_refined"] == 8 and r["meta"]["muse_quote"] == "muddy brown"
+    assert r["meta"]["sam_refined"] == 9 and r["meta"]["muse_quote"] == "muddy brown"
+    assert r["meta"]["recorded"] is True
     assert "Muse Spark" in r["ground"]["label_source"]
     n, muse = card._meta_info(r)
-    assert n == 8 and muse == 'Muse Spark: \u201cmuddy brown\u201d'
+    assert n == 9 and muse == 'Muse Spark: \u201cmuddy brown\u201d'
 
 
 def test_demo_sam_boxes_within_image():
     r = demo.demo_report()
     boxes = r["scar"]["sam_boxes"]
-    assert 1 <= len(boxes) <= 3
+    assert len(boxes) == 9
     h, w = r["scar"]["rgb_after"].shape[:2]
     for l, t, rr, b in boxes:
-        assert 0 <= l < rr < w and 0 <= t < b < h
+        assert 0 <= l < rr <= w and 0 <= t < b <= h
 
 
 def test_card_renders_demo_meta(tmp_path):
@@ -141,7 +146,9 @@ def test_share_buttons_link_to_whatsapp_and_promise_no_identity():
 def test_app_chip_texts():
     from two_eyes import app
     chip = app._chip_html()
-    assert "SAM 3.1 refined 8 scars" in chip and "Muse Spark" in chip and "muddy brown" in chip
+    assert "SAM 3.1" in chip and "refined 9 scars" in chip
+    assert "Muse Spark" in chip and "muddy brown" in chip
+    assert "Meta" in chip
 
 
 def test_picking_a_known_spot_fills_its_coordinates_and_hides_the_custom_fields():

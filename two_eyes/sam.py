@@ -1,5 +1,9 @@
-"""SAM 3.1 on Meta Model API: box prompts on images, concept prompts on video."""
+"""SAM 3.1 on Meta Model API: box prompts on images, concept prompts on video.
+
+Every API response is cached to disk; a cache hit never re-calls Meta.
+"""
 import base64
+import hashlib
 import io
 import os
 
@@ -7,6 +11,8 @@ import numpy as np
 from PIL import Image
 
 from . import config as C
+from . import meta_cache
+from .secrets import ensure_model_api_key
 
 _client = None
 
@@ -15,9 +21,10 @@ def client():
     global _client
     if _client is None:
         from openai import OpenAI
+        ensure_model_api_key()
         key = os.environ.get("MODEL_API_KEY")
         if not key:
-            raise RuntimeError("MODEL_API_KEY is not set (Colab: Secrets -> MODEL_API_KEY).")
+            raise RuntimeError("MODEL_API_KEY is not set (put it in ~/.secrets/MODEL_API_KEY).")
         _client = OpenAI(base_url=C.META_BASE_URL, api_key=key)
     return _client
 
@@ -28,12 +35,36 @@ def _png_data_url(rgb):
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
-def _call(text, media_part):
+def _png_bytes(rgb):
+    buf = io.BytesIO()
+    Image.fromarray(rgb).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _call(text, media_part, cache_extra=""):
+    """Cached SAM responses.create. Returns output_text string."""
+    # Hash text + a stable digest of the media (not the full data-URL) for the cache key.
+    media_digest = ""
+    if isinstance(media_part, dict):
+        for k in ("image_url", "video_url"):
+            if k in media_part and isinstance(media_part[k], str):
+                # data URL: hash the payload after the comma
+                raw = media_part[k]
+                payload = raw.split(",", 1)[-1] if "," in raw else raw
+                media_digest = hashlib.sha256(payload.encode() if isinstance(payload, str) else payload).hexdigest()
+                break
+    key = meta_cache.make_key("sam", C.SAM_MODEL, text, media_digest, cache_extra)
+    hit = meta_cache.get(key)
+    if hit is not None and "output_text" in hit:
+        return hit["output_text"] or ""
     resp = client().responses.create(
         model=C.SAM_MODEL,
         input=[{"type": "message", "role": "user", "content": [{"type": "input_text", "text": text}, media_part]}],
         metadata={"mask_encoding": "one_bit"})
-    return resp.output_text or ""
+    text_out = resp.output_text or ""
+    meta_cache.put(key, {"output_text": text_out, "model": C.SAM_MODEL})
+    meta_cache.bump_calls(1)
+    return text_out
 
 
 def _records(text, video=False):
@@ -82,17 +113,42 @@ def refine_boxes(rgb, boxes):
                 for j, (l, t, r, b) in enumerate(boxes[i:i + 16])]
         text = build_object_prompt(size=(W * k, H * k), objects=objs)
         full = np.zeros((H * k, W * k), dtype=bool)
-        for rec in _records(_call(text, {"type": "input_image", "image_url": url})):
+        for rec in _records(_call(text, {"type": "input_image", "image_url": url},
+                                  cache_extra=f"boxes:{boxes[i:i+16]}")):
             _paste(rec, full)
         out |= _shrink(full, k)
     return out
 
 
+def concept_boxes(rgb, prompt):
+    """Concept-prompt SAM 3.1 on a still. Returns list of (l,t,r,b) half-open boxes on the image grid."""
+    H, W = rgb.shape[:2]
+    url = _png_data_url(rgb)
+    text = _call(prompt, {"type": "input_image", "image_url": url}, cache_extra=f"concept:{prompt}:{H}x{W}")
+    boxes = []
+    full = np.zeros((H, W), dtype=bool)
+    for rec in _records(text):
+        _paste(rec, full)
+        # derive a box from this record's mask bounds
+        try:
+            x1, y1 = _bounds(rec)
+            m = rec.mask
+            boxes.append((x1, y1, x1 + m.width, y1 + m.height))
+        except Exception:
+            pass
+    if not boxes and full.any():
+        ys, xs = np.where(full)
+        boxes.append((int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1))
+    return boxes, full
+
+
 def segment_video(mp4_path, prompt, size):
     """Concept-prompt SAM 3.1 on a clip. Returns {frame_index: bool mask (H, W)}."""
     w, h = size
-    url = "data:video/mp4;base64," + base64.b64encode(open(mp4_path, "rb").read()).decode()
-    text = _call(prompt, {"type": "input_video", "video_url": url})
+    raw = open(mp4_path, "rb").read()
+    url = "data:video/mp4;base64," + base64.b64encode(raw).decode()
+    text = _call(prompt, {"type": "input_video", "video_url": url},
+                 cache_extra=f"video:{prompt}:{w}x{h}:{hashlib.sha256(raw).hexdigest()[:16]}")
     frames = {}
     for rec in _records(text, video=True):
         f = rec.identity.frame_index if rec.identity.frame_index is not None else (

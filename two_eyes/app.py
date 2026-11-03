@@ -138,11 +138,17 @@ def _chip_html():
     meta = r.get("meta") or {}
     chips = []
     if meta.get("sam_refined"):
-        chips.append(f'<span class="chip">SAM 3.1 refined {meta["sam_refined"]} scars</span>')
+        tag = "recorded Meta" if meta.get("recorded") else "Meta Model API"
+        chips.append(f'<span class="chip">SAM 3.1 ({tag}) refined {meta["sam_refined"]} scars</span>')
     muse = meta.get("muse_quote") or (r.get("ground") or {}).get("label")
     if muse:
-        chips.append(f'<span class="chip">Muse Spark: &ldquo;{muse}&rdquo;</span>')
-    return '<div class="chip-row">' + "".join(chips) + "</div>" if chips else ""
+        chips.append(f'<span class="chip">Muse Spark (Meta): &ldquo;{muse}&rdquo;</span>')
+    sj = r.get("scar_judge") or {}
+    if sj.get("hit_rate") is not None:
+        chips.append(f'<span class="chip">Muse scar judge hit rate {sj["hit_rate"]:.0%} (n={sj.get("n")})</span>')
+    if not chips:
+        return ""
+    return '<div class="chip-row">' + "".join(chips) + "</div>"
 
 
 def _hero_html():
@@ -216,8 +222,10 @@ def launch(share=False, warm=True):
 
     banner = ""
     if demo.is_demo_mode():
-        banner = ('<div id="demo-banner"><span class="mono">Demo mode</span><br>Every check shows the recorded '
-                  'Birim N4 bridge result of 28 Oct 2026. No Earth Engine and no Meta API calls are made.</div>')
+        banner = ('<div id="demo-banner"><span class="mono">Demo mode</span><br>'
+                  'Cached Birim N4 bridge result from the recorded run of 28 Oct 2026. '
+                  'No live Earth Engine or Meta API calls — scar outlines and Muse colour '
+                  'are from the recorded Meta run.</div>')
 
     theme = gr.themes.Base(primary_hue="neutral", neutral_hue="neutral")   # page look is set by CSS
     with gr.Blocks(title="Two Eyes: check upstream") as ui:

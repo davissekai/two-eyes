@@ -87,19 +87,26 @@ def headline(r):
 
 
 def share_text(r, use_llm=True):
-    """WhatsApp message. Muse Spark rewrites the facts plainly; falls back to the template."""
+    """WhatsApp message. Muse Spark writes under check-grounded rules; falls back to the template.
+
+    Replaces the optional free rewrite: every Muse sentence names a check; code drops sentences
+    whose check did not pass. A minimum card always survives.
+    """
     base = " ".join(headline(r))
     if not (use_llm and C.SHARE_LLM):
         return base
     try:
-        from .sam import client
-        prompt = ("Rewrite this evidence summary as a short WhatsApp message in plain English for Ghanaian "
-                  "readers (max 60 words). Keep every number and every caution exactly. Add no new facts, "
-                  "no greeting, no percentages, no accusations against people.\n\n" + base)
-        out = client().responses.create(model=C.TEXT_MODEL, input=prompt).output_text.strip()
-        return out if 20 < len(out) < 500 and "%" not in out else base
+        from .secrets import ensure_model_api_key
+        if not ensure_model_api_key():
+            return base
+        from . import card_muse
+        out = card_muse.write_card(r, use_llm=True)
+        if out and 20 < len(out) < 800 and "%" not in out:
+            return out
+        # None = Muse unavailable → headline template below
     except Exception:
-        return base
+        pass
+    return base
 
 
 def _meta_info(r):
@@ -238,19 +245,24 @@ def render(r, path):
     if mask is not None and mask.any():
         # ~2px at 150 dpi: linewidth_pt = 2 * 72 / 150 ≈ 0.96
         ax.contour(mask.astype(float), levels=[0.5], colors=[LIME], linewidths=1.0)
-    illustrative = bool(r.get("demo") or s.get("boxes_illustrative"))
+    illustrative = bool(s.get("boxes_illustrative"))
+    recorded = bool(r.get("recorded_meta") or s.get("boxes_recorded_meta"))
     if illustrative and mask is not None and mask.any():
-        # graphite chip + lime text (machine tag over imagery)
         ax.text(0.03, 0.06, "Illustrative outlines, not live SAM", transform=ax.transAxes,
+                fontsize=7.5, color=LIME, family=MONO, va="bottom",
+                bbox=dict(boxstyle="round,pad=0.45", fc=GRAPHITE, ec="none", alpha=0.92))
+    elif recorded and mask is not None and mask.any():
+        ax.text(0.03, 0.06, "SAM 3.1 recorded Meta run · 28 Oct 2026", transform=ax.transAxes,
                 fontsize=7.5, color=LIME, family=MONO, va="bottom",
                 bbox=dict(boxstyle="round,pad=0.45", fc=GRAPHITE, ec="none", alpha=0.92))
     # chip: EVIDENCE CARD — lime fill + graphite text (allowed: lime fill with graphite text)
     ax.text(0.02, 0.97, "EVIDENCE CARD", transform=ax.transAxes, fontsize=9, family=MONO,
             color=GRAPHITE, va="top", ha="left",
             bbox=dict(boxstyle="square,pad=0.55", fc=LIME, ec="none"))
-    # DEMO chip: graphite fill + lime text
+    # DEMO chip: graphite fill + lime text — label recorded Meta honestly
     if r.get("demo"):
-        ax.text(0.02, 0.86, "DEMO · ILLUSTRATIVE", transform=ax.transAxes, fontsize=8,
+        label = "DEMO · RECORDED META RUN" if recorded else "DEMO · ILLUSTRATIVE"
+        ax.text(0.02, 0.86, label, transform=ax.transAxes, fontsize=8,
                 family=MONO, color=LIME, va="top", ha="left",
                 bbox=dict(boxstyle="square,pad=0.45", fc=GRAPHITE, ec="none"))
     # Two Eyes mark over imagery (left bone ring / laterite pupil, right lime crosshair)

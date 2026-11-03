@@ -16,8 +16,19 @@ def ee():
     return _ee
 
 
-def init(project):
-    """Authenticate (if needed) and initialise Earth Engine."""
+def init(project=None):
+    """Authenticate (if needed) and initialise Earth Engine.
+
+    `project` defaults to the EE_PROJECT environment variable. Never hard-code a
+    project id or other secret in source.
+    """
+    import os
+    project = project or os.environ.get("EE_PROJECT")
+    if not project:
+        raise ValueError(
+            "EE_PROJECT is not set. Export EE_PROJECT=<your-gcp-project-id> "
+            "(or pass project= to earth.init)."
+        )
     E = ee()
     try:
         E.Initialize(project=project)
