@@ -22,13 +22,22 @@ CUSTOM = "Custom point"
 # The bundled bridge/hero imagery is the Goldenwabbit photo, not the old Pra/Beposo clip.
 HERO_CREDIT = "Photo: Goldenwabbit, Wikimedia Commons, CC BY-SA 4.0"
 
-# Asks the phone for its position. Needs https or localhost; on refusal the fields stay empty to type in.
+# Asks the phone for its position and says plainly what happened. Needs https or localhost;
+# on failure the fields stay empty to type in, and the message says why.
 LOCATE_JS = """async () => {
+  const fail = (why) => [null, null, `<p class="gps-msg bad">${why} Or pick a spot below.</p>`];
+  if (!navigator.geolocation || !window.isSecureContext)
+    return fail("This page can't use your location (it needs a secure https link).");
   try {
     const p = await new Promise((ok, no) => navigator.geolocation.getCurrentPosition(ok, no,
       {enableHighAccuracy: true, timeout: 15000}));
-    return [p.coords.latitude, p.coords.longitude];
-  } catch (e) { return [null, null]; }
+    const c = p.coords;
+    return [c.latitude, c.longitude, `<p class="gps-msg">Location found: ${c.latitude.toFixed(4)}, ` +
+      `${c.longitude.toFixed(4)} (within about ${Math.round(c.accuracy)} m).</p>`];
+  } catch (e) {
+    return fail(e.code === 1 ? "Location is blocked. Allow location for this site in your browser settings."
+                             : "Couldn't get a GPS fix. Try again in the open, away from buildings.");
+  }
 }"""
 # The brand is light mode only; Gradio would otherwise follow a dark phone and turn the text white.
 LIGHT_JS = "() => { document.body.classList.remove('dark'); document.documentElement.classList.remove('dark'); }"
@@ -150,7 +159,7 @@ def _hero_html():
         '<ol class="steps">'
         '<li><span><b>Find a safe, public spot by the river</b><small>A bridge, a riverbank, a ferry landing '
         'or a footpath crossing.</small></span></li>'
-        '<li><span><b>Film the water for 10 seconds</b><small>Optional, but it makes the card stronger.</small></span></li>'
+        '<li><span><b>Film the water for 10 seconds</b><small>This is your evidence: it shows the river is muddy today.</small></span></li>'
         '<li><span><b>Share the evidence card</b><small>We look upstream from space and write it up for '
         'you.</small></span></li></ol>'
         '<div class="safe"><span>Public places only</span><span>Your location is rounded to 1 km</span>'
@@ -160,7 +169,7 @@ def _hero_html():
         f'<span class="cap">{HERO_CREDIT}</span></div></div></div>')
 
 
-_GUIDE = ('<div class="field-label"><span class="num">2</span>Film the water <span class="hint">(optional)'
+_GUIDE = ('<div class="field-label"><span class="num">2</span>Film the water <span class="hint">(your evidence)'
           '</span></div><div class="guide"><div class="phone" aria-hidden="true"><i></i></div><ul>'
           '<li>From a bridge, point down at the water</li>'
           '<li>From the bank, aim across at open water, not the muddy edge</li>'
@@ -218,7 +227,8 @@ def launch(share=False, warm=True):
             with gr.Column():
                 gr.HTML('<div class="field-label"><span class="num">1</span>Where are you?</div>',
                         elem_classes=["plain"])
-                locate = gr.Button("◎  I'm at the river now", elem_id="locate")
+                locate = gr.Button("📍  Use my current location (GPS)", elem_id="locate")
+                gps_msg = gr.HTML("", elem_classes=["plain"])
                 spot = gr.Dropdown([(k.split(" (")[0], k) for k in DEMO_SPOTS] +
                                    [("Somewhere else (type coordinates)", CUSTOM)],
                                    value=list(DEMO_SPOTS)[0], label="Or pick a spot people have checked")
@@ -253,7 +263,7 @@ def launch(share=False, warm=True):
         gr.HTML(_FOOTER, elem_classes=["plain"])
 
         spot.change(_fill, [spot], [lat, lon, custom_fields])
-        locate.click(None, None, [lat, lon], js=LOCATE_JS).then(lambda: CUSTOM, None, spot)
+        locate.click(None, None, [lat, lon, gps_msg], js=LOCATE_JS).then(lambda: CUSTOM, None, spot)
         go.click(None, None, None, js=SCROLL_JS).then(
             _go, [spot, lat, lon, clip],
             [sample_tag, readout_box, log, verdict, trace, eyes, preview, share_box, txt, card_file, report, results])

@@ -189,3 +189,15 @@ def test_sample_result_is_the_recorded_birim_case_in_its_own_folder(tmp_path, mo
     assert "wa.me" in s["share_html"]
     assert "Birim" in str(s["report"]["spot"])
     assert s["share_text"]
+
+
+def test_filming_the_water_is_not_presented_as_optional():
+    from two_eyes import app
+    assert "optional" not in (app._hero_html() + app._GUIDE).lower()
+    assert "evidence" in app._GUIDE.lower()
+
+
+def test_gps_failure_tells_the_person_why_and_what_to_do():
+    from two_eyes import app
+    js = app.LOCATE_JS
+    assert "blocked" in js and "pick a spot" in js and "Location found" in js

@@ -71,7 +71,11 @@ body {background:BONE !important;}
 .gradio-container button.primary:hover {background:#000 !important;}
 .gradio-container button.secondary, .gradio-container button:not(.primary) {background:PANEL !important;
   color:GRAPHITE !important; border:1px solid RULER !important; border-radius:10px !important; min-height:44px;}
-#locate {border-style:dashed !important; font-weight:600 !important;}
+#locate {border:1.5px solid GRAPHITE !important; font-weight:700 !important; min-height:52px !important;
+  font-size:1rem !important;}
+#locate:hover {background:PANEL2 !important;}
+.gps-msg {margin:.4rem 0 0; font-size:.92rem; color:GRAPHITE;}
+.gps-msg.bad {color:LATERITE;}
 .gradio-container pre, .gradio-container [class*='json'], .gradio-container [class*='json'] * {
   background:PANEL2 !important; color:GRAPHITE !important;}
 .gradio-container video {border-radius:14px;}
