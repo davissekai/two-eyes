@@ -35,7 +35,7 @@ def _check_passed(checks, tag):
 
 def minimum_card(r):
     """Always-surviving lines: location, NDVI change when present, caution."""
-    b = r.get("bridge") or {}
+    b = r.get("spot") or r.get("bridge") or {}
     s = r.get("scar") or {}
     name = b.get("name") or "this bridge"
     loc = f"{b.get('lat', 0):.4f}, {b.get('lon', 0):.4f}"
@@ -78,7 +78,7 @@ def write_card(r, use_llm=True):
     ground = r.get("ground") or {}
     allow_ground = bool(ground.get("water_found"))
     payload = {
-        "bridge": r.get("bridge"),
+        "bridge": r.get("spot") or r.get("bridge"),
         "scar": {k: (r.get("scar") or {}).get(k)
                  for k in ("area_ha", "distance_km", "ndvi_before", "ndvi_after", "lat", "lon")},
         "checks": {k: {"pass": (checks.get(k) or {}).get("pass"),
