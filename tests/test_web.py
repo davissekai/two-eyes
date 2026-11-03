@@ -154,7 +154,13 @@ def test_a_hung_check_gives_up_frees_its_slot_and_ignores_a_late_answer(client, 
 def test_check_without_clip_is_refused(client):
     r = client.post("/api/checks", data={"lat": 6.28442, "lon": -0.46118})
     assert r.status_code == 400
-    assert "preloaded" in r.json()["detail"].lower() or "photo or video" in r.json()["detail"].lower()
+    assert "film the water" in r.json()["detail"].lower()
+
+
+def test_empty_clip_is_refused(client):
+    files = {"clip": ("clip.mp4", b"", "video/mp4")}
+    r = client.post("/api/checks", data={"lat": 6.28442, "lon": -0.46118}, files=files)
+    assert r.status_code == 400 and "empty" in r.json()["detail"].lower()
 
 
 def test_desktop_css_is_wider_than_phone(client):
@@ -162,3 +168,11 @@ def test_desktop_css_is_wider_than_phone(client):
     assert "max-width:1100px" in css or "max-width: 1100px" in css
     assert "@media (min-width:900px)" in css or "@media (min-width: 900px)" in css
     assert "max-width:480px" in css  # mobile shell kept
+
+
+def test_failures_are_explained_in_plain_words():
+    from two_eyes.trace import NoRiverHere
+    from two_eyes.web import server
+    assert "river" in server._plain_reason(NoRiverHere("We couldn't find land that drains to a river")).lower()
+    assert server._plain_reason(RuntimeError("boom")) == server.FAIL_REASON
+    assert "boom" not in server._plain_reason(RuntimeError("boom"))

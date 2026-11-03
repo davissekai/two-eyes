@@ -142,6 +142,8 @@ def stations(r):
     g = r.get("ground")
     if not g:
         clip = ("skip", "no clip added")
+    elif g.get("error"):
+        clip = ("unknown", "couldn't read your clip")
     elif not g.get("water_found"):
         clip = ("unknown", "no river water found in the clip")
     elif g.get("muddy") is None:
@@ -244,15 +246,24 @@ def _sky_html(s):
 
 
 def _ground_html(g):
-    if not g or g.get("frame") is None and g.get("still") is None:
+    if not g:
         return ""
+    if g.get("frame") is None and g.get("still") is None:
+        if not g.get("error"):
+            return ""
+        # The clip was sent but could not be read: say so, never drop it silently.
+        return ('<div class="panel eye-card"><div class="eye-head"><span class="label">The ground eye</span>'
+                '<span class="mono">Your clip</span></div>'
+                '<p class="hint">We couldn\'t read your clip, so this result uses the satellite only. '
+                'Try a 10-second video of open water in daylight.</p></div>')
     frame = g.get("frame") if g.get("frame") is not None else g.get("still")
+    found = g.get("water_found", True)
     toggle = ""
-    if g.get("frame") is not None and g.get("still") is not None:
+    if found and g.get("frame") is not None and g.get("still") is not None:
         toggle = (f'<img class="mask" src="{data_uri(g["still"])}" alt="The same frame with the water we measured painted over">')
     label = html.escape(g.get("label") or "")
     swatch = ""
-    if g.get("rgb"):
+    if g.get("rgb") and found:
         rr, gg, bb = (int(x) for x in g["rgb"])
         swatch = (
             '<div class="swatches">'
@@ -261,14 +272,17 @@ def _ground_html(g):
             '<div class="sw"><i style="background:#4E5A3F"></i><span><b>A clear forest river</b>'
             '<small>for comparison</small></span></div></div>')
     frames = f'{g["frames_used"]} frames' if g.get("frames_used") else "your clip"
+    tag = f"Water found in {frames}" if found else "No river water found"
     return (
         '<div class="panel eye-card"><div class="eye-head"><span class="label">The ground eye</span>'
         '<span class="mono">Your clip</span></div>'
         '<label class="clip"><input type="checkbox" aria-label="Show the water we measured">'
         f'<img src="{data_uri(frame)}" alt="A frame from your clip">{toggle}'
-        f'<span class="tag">Water found in {frames}</span>'
+        f'<span class="tag">{tag}</span>'
         f'<span class="toggle">{"Tap to show the water we measured" if toggle else ""}</span></label>'
-        + (f'<p class="quote">“{label.capitalize()}.”</p>' if label else "")
+        + (f'<p class="quote">“{label.capitalize()}.”</p>' if label and found else "")
+        + ("" if found else '<p class="hint">We couldn\'t see river water in your clip, so we didn\'t read its colour. '
+           'Next time, point the camera at open water from a bridge or the bank.</p>')
         + swatch
         + (f'<p class="hint">{html.escape(g["credit"])}</p>' if g.get("credit") else "")
         + '</div>')

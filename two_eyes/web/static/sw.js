@@ -1,5 +1,5 @@
 // Keeps the app shell on the phone so it opens instantly and offline; checks always go to the network.
-const CACHE = "two-eyes-v2-responsive";
+const CACHE = "two-eyes-v3";
 const SHELL = ["/", "/page.css", "/static/app.css", "/static/app.js", "/hero.jpg", "/manifest.webmanifest",
   "/static/icon-192.png"];
 

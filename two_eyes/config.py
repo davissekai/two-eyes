@@ -69,6 +69,10 @@ META_BASE_URL = "https://api.meta.ai/v1"
 WATER_PROMPT = "river water"
 CLIP_FPS = 1                 # frames per second sent to SAM 3.1 (1 is plenty for water colour; halves latency)
 CLIP_MAX_S = 10
+STILL_CLIP_S = 3              # a photo becomes a 3 s still clip (3 frames at CLIP_FPS)
+PRIVACY_WORKERS = 5           # frames checked for faces/plates at once (2 Meta calls each)
+META_TIMEOUT_S = 120
+CARD_WRITER_EFFORT = "low"     # Muse Spark reasoning effort for the share text: every sentence is checked in code anyway          # one Meta API call; past this it is treated as failed, never left hanging
 CLIP_WIDTH = 480
 # Muddiness of the water pixels in the clip, from CIELAB b* (blue -, yellow/brown +).
 # Uncalibrated v1 thresholds, stated on the card as a rough reading.

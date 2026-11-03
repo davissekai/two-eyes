@@ -25,9 +25,10 @@ STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 OUT_ROOT = os.path.join(demo.OUT_DIR, "web")
 MAX_CLIP_BYTES = 80 * 1024 * 1024     # a 10 s phone clip is well under this
 MAX_JOBS = 50                         # finished checks kept in memory; the oldest are dropped
-MAX_RUNNING = 3                       # checks at once; each one calls Earth Engine and the paid models
+MAX_RUNNING = int(os.environ.get("TWO_EYES_MAX_RUNNING", "6"))  # checks at once; Meta calls are capped separately
 MAX_CHECK_SECONDS = 10 * 60           # a check normally takes about 3 minutes; past this it has hung
-FAIL_REASON = "Something went wrong on our side. Check your connection and try again."
+FAIL_REASON = "Something went wrong on our side. Try again in a minute."
+SKY_DOWN = "The satellite service didn't answer. Try again in a few minutes."
 BUSY = "Two Eyes is busy with other checks. Try again in a minute."
 TIMEOUT_REASON = "That check took too long. The satellite service may be slow; try again in a few minutes."
 
@@ -72,6 +73,7 @@ def _work(job_id, lat, lon, name, clip):
         with _LOCK:
             if job["state"] == "running":
                 job["state"] = "failed"
+                job["reason"] = _plain_reason(ex)
     finally:
         with _LOCK:
             if job["elapsed"] is None:
@@ -81,6 +83,16 @@ def _work(job_id, lat, lon, name, clip):
             shutil.rmtree(os.path.join(OUT_ROOT, job_id), ignore_errors=True)
         if clip:
             shutil.rmtree(os.path.dirname(clip), ignore_errors=True)
+
+
+def _plain_reason(ex):
+    """What the person can do about a failure, in plain words; internals stay in the server log."""
+    from ..trace import NoRiverHere
+    if isinstance(ex, NoRiverHere):
+        return str(ex)
+    if type(ex).__module__.startswith("ee") or "EEException" in type(ex).__name__:
+        return SKY_DOWN
+    return FAIL_REASON
 
 
 def _give_up_on_hung():
@@ -174,11 +186,13 @@ def spots():
 @app.post("/api/checks")
 async def start_check(lat: float = Form(..., ge=-90, le=90), lon: float = Form(..., ge=-180, le=180),
                       name: str = Form("", max_length=80), clip: Optional[UploadFile] = File(None)):
+    if clip is None or not getattr(clip, "filename", None):
+        raise HTTPException(400, "Film the water first: send a short video or a photo of the river.")
     if _running() >= MAX_RUNNING:
         raise HTTPException(429, BUSY)
-    if clip is None or not getattr(clip, "filename", None):
-        raise HTTPException(400, "Upload a photo or video of the river. Results are computed from your inputs — nothing is preloaded.")
     path = await _save_clip(clip)
+    if path is None:
+        raise HTTPException(400, "That file was empty. Film the water again and send it.")
     job_id = uuid.uuid4().hex
     with _LOCK:
         if _running() >= MAX_RUNNING:

@@ -25,7 +25,7 @@ def client():
         key = os.environ.get("MODEL_API_KEY")
         if not key:
             raise RuntimeError("MODEL_API_KEY is not set (put it in ~/.secrets/MODEL_API_KEY).")
-        _client = OpenAI(base_url=C.META_BASE_URL, api_key=key)
+        _client = OpenAI(base_url=C.META_BASE_URL, api_key=key, timeout=C.META_TIMEOUT_S, max_retries=2)
     return _client
 
 
@@ -57,10 +57,11 @@ def _call(text, media_part, cache_extra=""):
     hit = meta_cache.get(key)
     if hit is not None and "output_text" in hit:
         return hit["output_text"] or ""
-    resp = client().responses.create(
-        model=C.SAM_MODEL,
-        input=[{"type": "message", "role": "user", "content": [{"type": "input_text", "text": text}, media_part]}],
-        metadata={"mask_encoding": "one_bit"})
+    with meta_cache.SLOTS:
+        resp = client().responses.create(
+            model=C.SAM_MODEL,
+            input=[{"type": "message", "role": "user", "content": [{"type": "input_text", "text": text}, media_part]}],
+            metadata={"mask_encoding": "one_bit"})
     text_out = resp.output_text or ""
     meta_cache.put(key, {"output_text": text_out, "model": C.SAM_MODEL})
     meta_cache.bump_calls(1)

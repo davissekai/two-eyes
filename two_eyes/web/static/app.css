@@ -34,8 +34,9 @@ img {max-width:100%;}
   .screen[data-screen="film"] .body > .sub {grid-column:1 / -1;}
   .screen[data-screen="result"] .body {
     display:grid; grid-template-columns:minmax(280px, 1fr) minmax(320px, 1.15fr); gap:20px 28px;}
-  .screen[data-screen="result"] .body > .eyebrow,
-  .screen[data-screen="result"] .body > .section-title {grid-column:1 / -1;}
+  .screen[data-screen="result"] .body > .eyebrow {grid-column:1 / -1;}
+  /* the trace panel carries its own heading beside the verdict; a full-width title would drop to the bottom */
+  .screen[data-screen="result"] .body > .section-title {display:none;}
   .screen[data-screen="result"] #verdict {grid-column:1; grid-row:2 / span 2;}
   .screen[data-screen="result"] #trace {grid-column:2; grid-row:2;}
   .screen[data-screen="result"] #eyes {grid-column:2; grid-row:3;}
@@ -138,6 +139,7 @@ img {max-width:100%;}
 .film-box {border:1px solid var(--ruler); border-radius:16px; background:var(--panel); padding:16px; overflow:hidden;}
 .film-box video {display:block; width:calc(100% + 32px); margin:-16px; aspect-ratio:16/10; object-fit:cover;
   background:var(--graphite);}
+.film-box img#photo-preview {display:block; width:calc(100% + 32px); margin:-16px; aspect-ratio:16/10; object-fit:cover;}
 .film-box.has-clip {padding:16px;}
 .film-box.has-clip .guide {display:none;}
 
@@ -158,3 +160,6 @@ img {max-width:100%;}
 .chat {max-width:none;}
 
 @media (prefers-reduced-motion: reduce) {*, *::before, *::after {animation:none !important; transition:none !important;}}
+
+/* headings get focus on each screen change for screen readers; no box around them for sighted users */
+[tabindex="-1"]:focus {outline:none;}
