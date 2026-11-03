@@ -36,7 +36,7 @@ def _font_faces():
 
 
 _GRADIO = """
-body {background:BONE !important;}
+html, body, gradio-app, .gradio-app, #root, .main {background:BONE !important;}
 /* belt and braces for the light-only brand: Gradio's text colours come from these variables */
 .gradio-container, .dark .gradio-container, body.dark {--body-text-color:GRAPHITE; --body-text-color-subdued:LATERITE;
   --block-title-text-color:LATERITE; --block-label-text-color:LATERITE; --background-fill-primary:PANEL;
@@ -44,6 +44,7 @@ body {background:BONE !important;}
   --border-color-primary:RULER; color-scheme:light;}
 .gradio-container .plain, .gradio-container .prose {color:GRAPHITE !important;}
 .gradio-container {background:BONE !important; color:GRAPHITE !important; max-width:1280px !important;
+  margin-left:auto !important; margin-right:auto !important;
   font-family:G,'Geist',Arial,sans-serif !important; padding-bottom:0 !important;}
 .gradio-container h1, .gradio-container h2, .gradio-container h3 {color:GRAPHITE;}
 .gradio-container label {color:LATERITE !important; font-weight:600; background:transparent !important;}
