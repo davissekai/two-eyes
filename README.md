@@ -61,12 +61,16 @@ Filming point: N4 trunk-road bridge over the Birim (6.28442, -0.46118), 307 km²
 - Card text: Muse Spark writes under check-grounded rules (every sentence names a check; code drops
   sentences whose check failed). A minimum card (location, NDVI change, "Likely source, not proven")
   always survives.
-- Privacy: uploaded clips are SAM 3.1 concept-prompted for `face` then `license plate` and blurred
-  before storage/share; detection errors fail closed (clip does not ship unblurred).
+- Privacy: uploaded clips are SAM 3.1 concept-prompted for `face` and `license plate` (frames checked
+  side by side) and blurred before storage/share; detection errors fail closed (clip does not ship unblurred).
+- Input: a short video (MP4, MOV/HEVC, WebM) or a single photo of the water. A photo becomes a 3 s still
+  clip for the same SAM 3.1 path. A clip that can't be read, or shows no water, is said plainly on the result.
 - Meta API calls for the recorded Birim SAM + Muse colour + scar-judge score: see `birim_meta.json`
   and the local disk cache under `~/.two_eyes_cache/meta` (never re-called on a cache hit).
-- Speed: about 80 s for a new place; satellite results are cached per place (fixed dates), so a repeat
-  or pre-warmed spot takes about 16 s, all of it the clip.
+- Speed (live server, 2 vCPU, measured 2026-11-03): a new place takes about 2 to 4 minutes; satellite
+  results are cached per place (fixed dates), so a pre-warmed spot takes about 1 to 2 minutes, most of it
+  the clip and the card text. Six checks can run at once (a seventh is asked to wait); Meta calls are
+  capped server-wide and time out after 120 s.
 
 **The demo clip is a stand-in.** It is a slow pan made from the photograph
 ["Pra River Ghana.jpg"](https://commons.wikimedia.org/wiki/File:Pra_River_Ghana.jpg) (Pra River from the
