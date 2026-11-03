@@ -53,7 +53,7 @@ def _inside(prev, lat, lon):
 
 
 CACHE_DIR = os.environ.get("TWO_EYES_CACHE", os.path.expanduser("~/.two_eyes_cache"))
-CACHE_VERSION = "v4"   # bump when the sky pipeline changes
+CACHE_VERSION = "v5"   # bump when the sky pipeline changes
 
 
 def _cache_key(lat, lon, focus):
@@ -111,7 +111,8 @@ def sky_part(lat, lon, focus=None, use_sam=True, log=print, timings=None):
             continue
         boxes.append(bx)
         r["candidates"].append({"lat": cnd["lat"], "lon": cnd["lon"], "status": bx["status"],
-                                "area_ha": bx["area_ha"], "cloudy": bx["cloudy"]})
+                                "area_ha": bx["area_ha"], "cloudy": bx["cloudy"],
+                                "sam": bx.get("outline_method", "").startswith("SAM")})
         log(f"  {cnd['lat']:.5f}, {cnd['lon']:.5f}: {bx['status']} {bx['area_ha']} ha")
     t["refine_s"] = round(time.time() - clock, 1); clock = time.time()
 

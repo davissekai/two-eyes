@@ -103,17 +103,42 @@ def share_text(r, use_llm=True):
 
 
 def _meta_info(r):
-    """(n_refined, muse_quote) for the Meta strip: prefers r['meta'], else derives from the report."""
+    """(n_refined, muse_quote) for the Meta strip: prefers r['meta'], else derives from the report.
+
+    Only scars SAM actually outlined count; when the API was down the outline is NDVI alone.
+    """
     meta = r.get("meta") or {}
     n = meta.get("sam_refined")
     if n is None:
-        n = len([c for c in r.get("candidates", []) if c.get("status") == "SCAR"]) or 1
+        n = len([c for c in r.get("candidates", []) if c.get("status") == "SCAR" and c.get("sam")])
     quote = meta.get("muse_quote")
     if quote is None:
         g = r.get("ground") or {}
         if g.get("water_found") and g.get("label"):
             quote = g["label"]
-    return (n, f"Muse Spark: \u201c{quote}\u201d" if quote else None)
+    return (n, f"Muse Spark: “{quote}”" if quote else None)
+
+
+def checks_by(r):
+    """The CHECKS BY row: which models really did the work on this report, and nothing more."""
+    n, quote = _meta_info(r)
+    sam = f"SAM 3.1 refined {n} scar{'s' if n != 1 else ''}" if n else "Outlined from NDVI only (SAM 3.1 not used)"
+    return sam + (f" · {quote}" if quote else "")
+
+
+LEAD_LH = 1.15   # headline line height, in font sizes
+
+
+def fit_lead(text, panel_pt):
+    """Wrap the headline, shrinking the type until it fills at most 60% of its panel.
+
+    The rest of the panel holds the second sentence; a taller lead ran into the rows below.
+    """
+    for size, width in ((22, 42), (19, 50), (16, 60), (14, 68)):
+        lines = textwrap.wrap(text, width)
+        if len(lines) * size * LEAD_LH <= 0.6 * panel_pt:
+            break
+    return lines, size
 
 
 def public_point(lat, lon):
@@ -247,12 +272,12 @@ def render(r, path):
     ax = fig.add_subplot(gs[1]); ax.axis("off")
     h_lines = headline(r)
     lead = h_lines[0] if h_lines else ""
-    lead_lines = textwrap.wrap(lead, 42)
+    panel_pt = ax.get_position().height * fig.get_figheight() * 72
+    lead_lines, size = fit_lead(lead, panel_pt)
     y = 0.98
     for line in lead_lines:
-        ax.text(0.02, y, line, fontsize=22, va="top", family=SERIF, color=GRAPHITE,
-                linespacing=1.05)
-        y -= 0.22 * 1.05
+        ax.text(0.02, y, line, fontsize=size, va="top", family=SERIF, color=GRAPHITE)
+        y -= size * LEAD_LH / panel_pt
     sub = h_lines[1] if len(h_lines) > 1 else ""
     # Prefer the laterite meta line when present (demo: since early 2023 · 17.0 ha · …)
     if sub and ("·" in sub or "our check only" in sub.lower() or sub.startswith("since ")):
@@ -275,8 +300,7 @@ def render(r, path):
             ("LOCATION", location_text(spot), GRAPHITE),
             ("COMPARED", comp, GRAPHITE),
             ("FINDING", finding, GRAPHITE)]
-    n_refined, muse_quote = _meta_info(r)
-    rows.append(("CHECKS BY", f"SAM 3.1 refined {n_refined} scars" + (f" · {muse_quote}" if muse_quote else ""), LATERITE))
+    rows.append(("CHECKS BY", checks_by(r), LATERITE))
     for i, (k, v, col) in enumerate(rows):
         y = 0.88 - i * 0.185
         ax.plot([0.02, 0.98], [y - 0.125, y - 0.125], color=RULE_EDGE_HEX, lw=0.8)
