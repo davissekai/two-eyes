@@ -1,7 +1,7 @@
 """Demo mode: offline Birim result shaped like a live run.
 
-Turned on by DEMO_MODE=1, or whenever a live run could not work here (no Meta Model API key,
-or Earth Engine not usable). No Earth Engine and no Meta API calls are made in demo mode.
+Turned on only by DEMO_MODE=1 (off by default). No Earth Engine and no Meta API
+calls are made in demo mode. Missing keys no longer auto-enable this path.
 
 The satellite scar outlines and SAM boxes come from a recorded Meta SAM 3.1 run on the bundled
 Birim Sentinel tiles (28 Oct 2026), cached under two_eyes/assets/recorded/. Lead area 17.0 ha and
@@ -39,12 +39,13 @@ def _load_meta():
 
 
 def is_demo_mode():
-    """True when the live pipeline can't run here: DEMO_MODE=1, no Meta key, or Earth Engine unavailable."""
-    if os.environ.get("DEMO_MODE") == "1":
-        return True
-    if not os.environ.get("MODEL_API_KEY"):
-        return True
-    return not _ee_ready()
+    """True only when DEMO_MODE=1 is set explicitly. Off by default.
+
+    Missing API keys or Earth Engine no longer auto-enable demo mode — the live
+    path must fail honestly instead of serving a recorded Birim brief as if it
+    were a live result.
+    """
+    return os.environ.get("DEMO_MODE") == "1"
 
 
 def _ee_ready():

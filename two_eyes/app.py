@@ -70,10 +70,10 @@ def sections(r):
 
 
 def sample_result():
-    """The recorded Birim run, rendered offline, so the page opens on a real result and not empty boxes.
+    """Render the recorded Birim case offline (tests / explicit DEMO_MODE tooling only).
 
-    Written to its own folder so a later live run, which writes evidence_card.png in two_eyes_out,
-    never overwrites the card the page is showing.
+    Never call this to populate the live UI on load — the page must stay empty until
+    the user supplies a filming spot and a clip.
     """
     r = demo.run(demo.SPOT["lat"], demo.SPOT["lon"], name=demo.SPOT["name"],
                  out_dir=os.path.join(demo.OUT_DIR, "sample"), log=lambda *a: None)
@@ -104,6 +104,12 @@ def run_live(spot, lat, lon, clip):
         yield readout.html(lines, finished=True, failed=True, reason=fix), "\n".join(lines), None
         return
     lat_f, lon_f, name = point
+    if not clip:
+        fix = ("We need your film of the river. Upload a photo or video of the water — "
+               "results are computed from what you send, nothing is preloaded.")
+        lines.append("Something failed: no clip. " + fix)
+        yield readout.html(lines, finished=True, failed=True, reason=fix), "\n".join(lines), None
+        return
 
     def work():
         try:
@@ -122,7 +128,7 @@ def run_live(spot, lat, lon, clip):
             continue
         yield readout.html(lines, finished=False), "\n".join(lines), None
     if "error" in box:
-        lines += [box["error"], "Offline? Set DEMO_MODE=1 (or unset MODEL_API_KEY) to see the demo result."]
+        lines += [box["error"], "Offline? Set DEMO_MODE=1 to use the recorded offline demo (explicit flag only)."]
         yield readout.html(lines, finished=True, failed=True), "\n".join(lines), None
         return
     yield (readout.html(lines, finished=True, elapsed_s=time.time() - t0), "\n".join(lines),
@@ -130,25 +136,30 @@ def run_live(spot, lat, lon, clip):
 
 
 def _chip_html():
-    """Machine-lime mono chips: what SAM 3.1 did + the Muse Spark line when present."""
-    try:
-        r = demo.demo_report()
-    except Exception:
-        return ""
-    meta = r.get("meta") or {}
-    chips = []
-    if meta.get("sam_refined"):
-        tag = "recorded Meta" if meta.get("recorded") else "Meta Model API"
-        chips.append(f'<span class="chip">SAM 3.1 ({tag}) refined {meta["sam_refined"]} scars</span>')
-    muse = meta.get("muse_quote") or (r.get("ground") or {}).get("label")
-    if muse:
-        chips.append(f'<span class="chip">Muse Spark (Meta): &ldquo;{muse}&rdquo;</span>')
-    sj = r.get("scar_judge") or {}
-    if sj.get("hit_rate") is not None:
-        chips.append(f'<span class="chip">Muse scar judge hit rate {sj["hit_rate"]:.0%} (n={sj.get("n")})</span>')
-    if not chips:
-        return ""
+    """Capability chips for the empty page — never claim a recorded run as a live result."""
+    chips = [
+        '<span class="chip">Needs your clip + location</span>',
+        '<span class="chip">SAM 3.1 scar refine</span>',
+        '<span class="chip">Muse Spark colour</span>',
+        '<span class="chip">Catchment trace upstream</span>',
+    ]
     return '<div class="chip-row">' + "".join(chips) + "</div>"
+
+
+def _empty_state_html():
+    """Shown until the user runs a check with real inputs."""
+    return (
+        '<div class="empty-state" id="empty-state">'
+        '<p class="mono">Waiting for your check</p>'
+        '<h3>No brief yet</h3>'
+        '<p>Pick a filming spot and upload a photo or video of the river. '
+        'Results are computed from what you send — nothing is preloaded.</p>'
+        '<ol>'
+        '<li>Choose where you are (GPS, a known spot, or typed coordinates)</li>'
+        '<li>Upload your film of the water</li>'
+        '<li>Tap <b>Check upstream</b></li>'
+        '</ol></div>'
+    )
 
 
 def _hero_html():
@@ -196,7 +207,8 @@ def _head(title, right=""):
 def launch(share=False, warm=True):
     import gradio as gr
 
-    sample = sample_result()
+    empty = {"verdict": "", "trace": "", "eyes": "", "preview": "", "share_html": "",
+             "card_png": None, "share_text": "", "report": None}
 
     def _fill(spot):
         """Spot picks fill the coordinate boxes; 'Custom point' leaves them as typed and shows them."""
@@ -206,75 +218,87 @@ def launch(share=False, warm=True):
         return gr.skip(), gr.skip(), gr.update(visible=custom)
 
     def _go(spot, lat, lon, clip):
-        """Stream the readout, then fill the case file. The sample tag goes as soon as a run starts."""
+        """Stream the readout, then fill the case file. Empty state hides as soon as a run starts."""
         for html, log_text, s in run_live(spot, lat, lon, clip):
-            out = {sample_tag: gr.update(visible=False), readout_box: html, log: log_text}
+            out = {empty_box: gr.update(visible=False), demo_tag: gr.update(visible=False),
+                   readout_box: html, log: log_text}
             if s:
                 out.update({verdict: s["verdict"], trace: s["trace"], eyes: s["eyes"], preview: s["preview"],
-                            share_box: s["share_html"], txt: s["share_text"], card_file: s["card_png"],
+                            share_box: s["share_html"], txt: s["share_text"],
+                            card_file: gr.update(value=s["card_png"], visible=True),
                             report: s["report"], results: gr.update(visible=True)})
             else:
+                # Keep results hidden while streaming / on failure so no stale brief shows.
                 out[results] = gr.update(visible=False)
+                if "didn't finish" in html or "Something failed" in log_text or "no clip" in log_text.lower() or "no coordinates" in log_text.lower():
+                    out[empty_box] = gr.update(visible=True)
             yield out
 
-    if warm:
+    if warm and not demo.is_demo_mode():
         threading.Thread(target=lambda: _quiet_warm(list(DEMO_SPOTS.values())), daemon=True).start()
 
     banner = ""
     if demo.is_demo_mode():
-        banner = ('<div id="demo-banner"><span class="mono">Demo mode</span><br>'
-                  'Cached Birim N4 bridge result from the recorded run of 28 Oct 2026. '
-                  'No live Earth Engine or Meta API calls — scar outlines and Muse colour '
-                  'are from the recorded Meta run.</div>')
+        banner = ('<div id="demo-banner"><span class="mono">Demo mode (DEMO_MODE=1)</span><br>'
+                  'Checks will use the recorded Birim N4 bridge case from 28 Oct 2026 — '
+                  'clearly labelled, not a live result. No Earth Engine or Meta API calls.</div>')
 
     theme = gr.themes.Base(primary_hue="neutral", neutral_hue="neutral")   # page look is set by CSS
     with gr.Blocks(title="Two Eyes: check upstream") as ui:
         gr.HTML(_hero_html() + banner + _chip_html(), elem_classes=["plain"])
         gr.HTML(_head("Check a river", '<span class="mono">Takes about a minute</span>'), elem_classes=["plain"])
-        with gr.Row(elem_id="row-input", equal_height=False):
-            with gr.Column():
-                gr.HTML('<div class="field-label"><span class="num">1</span>Where are you?</div>',
-                        elem_classes=["plain"])
-                locate = gr.Button("📍  Use my current location (GPS)", elem_id="locate")
-                gps_msg = gr.HTML("", elem_classes=["plain"])
-                spot = gr.Dropdown([(k.split(" (")[0], k) for k in DEMO_SPOTS] +
-                                   [("Somewhere else (type coordinates)", CUSTOM)],
-                                   value=list(DEMO_SPOTS)[0], label="Or pick a spot people have checked")
-                with gr.Group(visible=False, elem_id="custom-fields") as custom_fields:
-                    lat = gr.Number(label="Latitude", value=6.28442)
-                    lon = gr.Number(label="Longitude", value=-0.46118)
-            with gr.Column():
-                gr.HTML(_GUIDE, elem_classes=["plain"])
-                clip = gr.Video(label="Your clip of the river", sources=["upload", "webcam"])
-        go = gr.Button("Check upstream", variant="primary")
-        readout_box = gr.HTML("", elem_id="readout", elem_classes=["plain"])   # empty until a check runs
-
-        gr.HTML(_head("What we found"), elem_classes=["plain"])
-        sample_tag = gr.HTML(f'<span class="sample-tag">Sample: recorded run, {demo.SPOT["name"]}, '
-                             '28 Oct 2026</span>', elem_classes=["plain"])
-        with gr.Column(visible=True) as results:
-            verdict = gr.HTML(sample["verdict"], elem_classes=["plain"])
-            trace = gr.HTML(sample["trace"], elem_classes=["plain"])
-            eyes = gr.HTML(sample["eyes"], elem_classes=["plain"])
-            gr.HTML(_head("Share it"), elem_classes=["plain"])
-            with gr.Row(elem_id="row-share", equal_height=False):
-                preview = gr.HTML(sample["preview"], elem_classes=["plain"])
-                with gr.Column():
-                    share_box = gr.HTML(sample["share_html"], elem_classes=["plain"])
-                    card_file = gr.DownloadButton("Save the card", value=sample["card_png"])
-                    txt = gr.Textbox(sample["share_text"], label="Message (edit before you send)", lines=4,
-                                     buttons=["copy"])
-                    gr.HTML(share_ui.next_steps_html(), elem_classes=["plain"])
+        with gr.Row(elem_id="workspace", equal_height=False):
+            with gr.Column(elem_id="col-inputs", scale=5):
+                with gr.Row(elem_id="row-input", equal_height=False):
+                    with gr.Column():
+                        gr.HTML('<div class="field-label"><span class="num">1</span>Where are you?</div>',
+                                elem_classes=["plain"])
+                        locate = gr.Button("📍  Use my current location (GPS)", elem_id="locate")
+                        gps_msg = gr.HTML("", elem_classes=["plain"])
+                        spot = gr.Dropdown(
+                            [(k.split(" (")[0], k) for k in DEMO_SPOTS] +
+                            [("Somewhere else (type coordinates)", CUSTOM)],
+                            value=CUSTOM, label="Or pick a spot people have checked")
+                        with gr.Group(visible=True, elem_id="custom-fields") as custom_fields:
+                            lat = gr.Number(label="Latitude", value=None)
+                            lon = gr.Number(label="Longitude", value=None)
+                    with gr.Column():
+                        gr.HTML(_GUIDE, elem_classes=["plain"])
+                        clip = gr.Video(label="Your clip of the river (required)", sources=["upload", "webcam"])
+                go = gr.Button("Check upstream", variant="primary")
+                readout_box = gr.HTML("", elem_id="readout", elem_classes=["plain"])
+            with gr.Column(elem_id="col-results", scale=6):
+                gr.HTML(_head("What we found"), elem_classes=["plain"])
+                demo_tag = gr.HTML(
+                    ('<span class="sample-tag">Demo: recorded run will be used if you check '
+                     f'with DEMO_MODE=1 — {demo.SPOT["name"]}, 28 Oct 2026</span>'
+                     if demo.is_demo_mode() else ""),
+                    visible=demo.is_demo_mode(), elem_classes=["plain"])
+                empty_box = gr.HTML(_empty_state_html(), elem_classes=["plain"])
+                with gr.Column(visible=False) as results:
+                    verdict = gr.HTML(empty["verdict"], elem_classes=["plain"])
+                    trace = gr.HTML(empty["trace"], elem_classes=["plain"])
+                    eyes = gr.HTML(empty["eyes"], elem_classes=["plain"])
+                    gr.HTML(_head("Share it"), elem_classes=["plain"])
+                    with gr.Row(elem_id="row-share", equal_height=False):
+                        preview = gr.HTML(empty["preview"], elem_classes=["plain"])
+                        with gr.Column():
+                            share_box = gr.HTML(empty["share_html"], elem_classes=["plain"])
+                            card_file = gr.DownloadButton("Save the card", value=None, visible=False)
+                            txt = gr.Textbox(empty["share_text"], label="Message (edit before you send)",
+                                             lines=4, buttons=["copy"])
+                            gr.HTML(share_ui.next_steps_html(), elem_classes=["plain"])
         with gr.Accordion("How the checks ran", open=False):
             log = gr.Textbox(label="What the checks did", lines=8)
-            report = gr.JSON(sample["report"], label="Full report")
+            report = gr.JSON(None, label="Full report")
         gr.HTML(_FOOTER, elem_classes=["plain"])
 
         spot.change(_fill, [spot], [lat, lon, custom_fields])
         locate.click(None, None, [lat, lon, gps_msg], js=LOCATE_JS).then(lambda: CUSTOM, None, spot)
         go.click(None, None, None, js=SCROLL_JS).then(
             _go, [spot, lat, lon, clip],
-            [sample_tag, readout_box, log, verdict, trace, eyes, preview, share_box, txt, card_file, report, results])
+            [empty_box, demo_tag, readout_box, log, verdict, trace, eyes, preview, share_box, txt,
+             card_file, report, results])
     # Gradio 6: css and theme live in launch(), not Blocks
     ui.launch(share=share, debug=False, css=build_css(), theme=theme, js=LIGHT_JS)
 

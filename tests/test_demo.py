@@ -13,10 +13,17 @@ def test_is_demo_mode_when_env_set(monkeypatch):
     assert demo.is_demo_mode()
 
 
-def test_is_demo_mode_without_meta_key(monkeypatch):
+def test_is_demo_mode_off_by_default_even_without_meta_key(monkeypatch):
     monkeypatch.delenv("DEMO_MODE", raising=False)
     monkeypatch.delenv("MODEL_API_KEY", raising=False)
-    assert demo.is_demo_mode()
+    assert not demo.is_demo_mode()
+
+
+def test_is_demo_mode_ignores_ee_when_flag_unset(monkeypatch):
+    monkeypatch.delenv("DEMO_MODE", raising=False)
+    monkeypatch.setenv("MODEL_API_KEY", "x")
+    monkeypatch.setattr(demo, "_ee_ready", lambda: False)
+    assert not demo.is_demo_mode()
 
 
 def test_share_llm_is_true():
@@ -146,9 +153,10 @@ def test_share_buttons_link_to_whatsapp_and_promise_no_identity():
 def test_app_chip_texts():
     from two_eyes import app
     chip = app._chip_html()
-    assert "SAM 3.1" in chip and "refined 9 scars" in chip
-    assert "Muse Spark" in chip and "muddy brown" in chip
-    assert "Meta" in chip
+    assert "SAM 3.1" in chip and "Muse Spark" in chip
+    assert "Needs your clip + location" in chip
+    assert "refined 9 scars" not in chip  # never present recorded stats as a live brief
+    assert "muddy brown" not in chip
 
 
 def test_picking_a_known_spot_fills_its_coordinates_and_hides_the_custom_fields():
@@ -167,11 +175,28 @@ def test_a_check_streams_progress_then_the_case_file(tmp_path, monkeypatch):
     monkeypatch.setenv("DEMO_MODE", "1")
     monkeypatch.chdir(tmp_path)
     name = list(app.DEMO_SPOTS)[0]
-    steps = list(app.run_live(name, *app.DEMO_SPOTS[name], None))
+    clip = tmp_path / "river.mp4"
+    clip.write_bytes(b"fake")  # demo path ignores clip bytes; presence is what the UI requires
+    steps = list(app.run_live(name, *app.DEMO_SPOTS[name], str(clip)))
     readout_html, log_text, s = steps[-1]
     assert "Done" in readout_html and "Demo mode" in log_text
     assert s and "football pitches" in s["verdict"] and "wa.me" in s["share_html"]
     assert all(step[2] is None for step in steps[:-1])
+
+
+def test_a_check_without_clip_says_what_to_do():
+    from two_eyes import app
+    name = list(app.DEMO_SPOTS)[0]
+    (readout_html, log_text, s), = list(app.run_live(name, *app.DEMO_SPOTS[name], None))
+    assert s is None and "clip" in log_text.lower()
+    assert "preloaded" in readout_html.lower() or "film" in readout_html.lower()
+
+
+def test_empty_state_prompts_for_inputs():
+    from two_eyes import app
+    html = app._empty_state_html()
+    assert "No brief yet" in html and "nothing is preloaded" in html
+    assert "Check upstream" in html
 
 
 def test_a_check_without_coordinates_says_what_to_do():

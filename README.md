@@ -77,8 +77,9 @@ and it is credited on every evidence card it appears on. The clip file itself is
 
 Base URL `https://api.meta.ai/v1` (OpenAI-SDK compatible). Models: `sam-3.1`, `muse-spark-1.3`.
 Load `MODEL_API_KEY` from `~/.secrets/MODEL_API_KEY` at runtime (never print, log, or commit). Every
-response is cached to disk; a cache hit never re-calls Meta. Demo mode (`DEMO_MODE=1`) serves the
-recorded Birim Meta run with no live API calls.
+response is cached to disk; a cache hit never re-calls Meta. Demo mode is **off by default**. Set `DEMO_MODE=1` explicitly to serve the
+recorded Birim Meta run with no live API calls. Missing keys no longer auto-enable demo mode,
+and the UI stays empty until you supply a filming spot and a clip.
 
 ## Run it (Google Colab)
 
