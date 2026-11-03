@@ -105,8 +105,17 @@ def verdict_html(r):
             f'<p class="next">{html.escape(next_step(r))}</p>'
             '<p class="hint">Only the authorities can say it is illegal. We give you evidence, not a verdict.</p>'
             '</div>')
-    return (f'<div class="verdict"><div class="panel"><h3>{_verdict_title(r)}</h3>{numbers}{_confluence_note(r)}</div>'
+    return (f'<div class="verdict"><div class="panel"><h3>{_verdict_title(r)}</h3>{numbers}{_confluence_note(r)}'
+            f'{_clip_nudge(r, level)}</div>'
             f'{"<div class=panel>" + ladder + "</div>" if ladder else ""}</div>')
+
+
+def _clip_nudge(r, level):
+    """No clip yet: the satellite found something, so ask for the ground eye that backs it up."""
+    if not level or r.get("ground"):
+        return ""
+    return ('<p class="next">Add a clip of the water: 10 seconds showing the river is muddy today makes '
+            'this card much stronger.</p>')
 
 
 def _confluence_note(r):

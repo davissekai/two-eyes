@@ -157,3 +157,20 @@ def test_demo_run_does_not_pretend_the_satellite_ran_live():
 def test_failed_run_says_so_in_plain_words():
     html = readout.html(["Something failed: ValueError: bad"], finished=True, failed=True)
     assert "didn't finish" in html.lower()
+
+
+# --- the clip is the citizen's evidence ---
+
+def test_result_without_a_clip_asks_for_one():
+    html = case_file.verdict_html(_r(A=True, B=True)).lower()
+    assert "add a clip" in html
+
+
+def test_result_with_a_clip_does_not_nag():
+    r = _r(A=True, B=True)
+    r["ground"] = {"water_found": True, "muddy": True, "label": "muddy brown"}
+    assert "add a clip" not in case_file.verdict_html(r).lower()
+
+
+def test_no_clip_nudge_when_there_is_nothing_upstream():
+    assert "add a clip" not in case_file.verdict_html(_r(A=False)).lower()
