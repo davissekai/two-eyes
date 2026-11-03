@@ -65,13 +65,13 @@ def snap_to_river(lat, lon):
     E = earth.ee()
     area = E.Geometry.Point([lon, lat]).buffer(C.SNAP_MAX_M)
     feats = (E.FeatureCollection(C.HYRIVERS).filterBounds(area)
-             .map(lambda f: f.select(["HYRIV_ID", "UPLAND_SKM"]).setGeometry(f.geometry().intersection(area, 1)))
+             .map(lambda f: E.Feature(f.geometry().intersection(area, 1), f.toDictionary(["REACH_ID", "UPLAND_SKM"])))
              .limit(20).getInfo()["features"])
     reaches = []
     for f in feats:
         for line in _lines(f.get("geometry") or {"type": None}):
             if line:
                 qlat, qlon, d = nearest_on_line(lat, lon, line)
-                reaches.append({"id": f["properties"]["HYRIV_ID"], "lat": qlat, "lon": qlon, "dist_m": d,
+                reaches.append({"id": f["properties"]["REACH_ID"], "lat": qlat, "lon": qlon, "dist_m": d,
                                 "upland_km2": f["properties"].get("UPLAND_SKM")})
     return choose(reaches)
