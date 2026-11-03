@@ -1,0 +1,129 @@
+/* The phone app shell: one screen at a time, main action pinned to the thumb.
+   Case-file pieces (verdict, trace, eyes, readout, share) are styled by /page.css. */
+:root {
+  --graphite:#15130F; --bone:#F2EDE4; --panel:#FAF7F1; --panel2:#E8E1D5; --silt:#C9A27E;
+  --laterite:#9C5A34; --lime:#D4FF3A; --ruler:rgba(21,19,15,.20);
+  --gutter:20px; --safe-b:env(safe-area-inset-bottom, 0px);
+  color-scheme:light;
+}
+* {box-sizing:border-box;}
+[hidden] {display:none !important;}
+html, body {margin:0; background:var(--bone); color:var(--graphite);}
+body {font:16px/1.45 G,'Geist',system-ui,sans-serif; -webkit-font-smoothing:antialiased;
+  -webkit-tap-highlight-color:transparent;}
+button, input {font:inherit; color:inherit;}
+img {max-width:100%;}
+
+/* On a big screen the app sits in a phone-width column, like an app, not a stretched page. */
+.app {max-width:480px; margin:0 auto; min-height:100dvh; display:flex; flex-direction:column; position:relative;}
+@media (min-width:600px) {
+  body {background:var(--panel2);}
+  .app {background:var(--bone); box-shadow:0 0 0 1px var(--ruler), 0 30px 80px rgba(21,19,15,.12);}
+}
+
+.topbar {position:sticky; top:0; z-index:5; display:grid; grid-template-columns:44px 1fr auto; align-items:center;
+  gap:8px; padding:calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px; background:color-mix(in srgb, var(--bone) 92%, transparent);
+  backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); border-bottom:1px solid transparent;}
+.topbar.scrolled {border-bottom-color:var(--ruler);}
+.back {grid-column:1; width:44px; height:44px; border:0; background:none; border-radius:99px; display:grid;
+  place-items:center; cursor:pointer;}
+.back:hover {background:var(--panel2);}
+.back svg {width:24px; height:24px; fill:none; stroke:var(--graphite); stroke-width:2; stroke-linecap:round;
+  stroke-linejoin:round;}
+.brand {grid-column:2; font:500 12px JB,monospace; letter-spacing:.1em; text-transform:uppercase;}
+.progress {grid-column:3; list-style:none; display:flex; gap:5px; margin:0; padding:0 4px;}
+.progress li {width:18px; height:4px; border-radius:99px; background:var(--ruler);}
+.progress li.on {background:var(--graphite);}
+
+.screen {flex:1; display:flex; flex-direction:column; animation:enter .28s ease-out;}
+.screen[hidden] {display:none;}
+.screen.back-in {animation-name:enter-back;}
+@keyframes enter {from {opacity:0; transform:translateX(18px);} to {opacity:1; transform:none;}}
+@keyframes enter-back {from {opacity:0; transform:translateX(-18px);} to {opacity:1; transform:none;}}
+.body {flex:1; padding:8px var(--gutter) 24px; display:flex; flex-direction:column; gap:14px; min-width:0;}
+.actions {position:sticky; bottom:0; z-index:4; padding:14px var(--gutter) calc(14px + var(--safe-b));
+  display:grid; gap:8px; background:linear-gradient(to top, var(--bone) 78%, transparent);}
+
+.display {font:400 clamp(48px,14vw,64px)/.92 IS,'Instrument Serif',serif; letter-spacing:-.025em; margin:6px 0 0;}
+.display em {display:block; color:var(--laterite);}
+.title {font:400 40px/1.02 IS,'Instrument Serif',serif; letter-spacing:-.015em; margin:0;}
+.section-title {font:400 28px/1.1 IS,serif; margin:18px 0 0;}
+.eyebrow {font:500 12px JB,monospace; letter-spacing:.1em; text-transform:uppercase; color:var(--laterite); margin:8px 0 0;}
+.sub, .lede {margin:0; font-size:17px; color:var(--graphite);}
+.lede {font-size:18px;}
+.label {margin:0; font-weight:600;}
+.fine {margin:0; font-size:13.5px; color:var(--laterite); text-align:center;}
+.body .fine {text-align:left;}
+
+.start-photo {margin:0 calc(-1 * var(--gutter)); border-radius:0; border-left:0; border-right:0; aspect-ratio:16/10;}
+.start-photo .tag {left:auto; right:16px; top:auto; bottom:30px;}
+.safe {list-style:none; margin:4px 0 0; padding:0; display:flex; flex-wrap:wrap; gap:8px;}
+.safe li {font-size:13px; border:1px solid var(--ruler); border-radius:99px; padding:5px 11px;}
+
+/* buttons */
+.btn {display:flex; align-items:center; justify-content:center; gap:10px; width:100%; min-height:56px; padding:0 20px;
+  border-radius:14px; border:1.5px solid var(--graphite); background:var(--panel); font-weight:700; font-size:17px;
+  text-decoration:none; color:var(--graphite); cursor:pointer; transition:transform .08s, background .15s;}
+.btn:active {transform:scale(.985);}
+.btn.primary {background:var(--graphite); color:var(--bone);}
+.btn.primary:hover {background:#000;}
+.btn:disabled {opacity:.35; cursor:not-allowed; transform:none;}
+.btn.quiet {border-color:var(--ruler); font-weight:600; min-height:52px;}
+.btn.link {border:0; background:none; min-height:44px; font-weight:600; font-size:15px; color:var(--laterite);
+  text-decoration:underline; text-underline-offset:3px;}
+.btn.gps {justify-content:flex-start; text-align:left; min-height:76px; border-width:2px; background:var(--panel);}
+.btn.gps svg {flex:none; width:34px; height:34px; fill:none; stroke:var(--graphite); stroke-width:1.8;}
+.btn.gps b {display:block; font-size:18px;}
+.btn.gps small {display:block; font-weight:400; font-size:14px; color:var(--laterite);}
+.btn.gps.busy svg {animation:spin 1.2s linear infinite;}
+.btn.gps.ok {border-color:var(--graphite); background:var(--graphite); color:var(--bone);}
+.btn.gps.ok svg {stroke:var(--lime);} .btn.gps.ok small {color:var(--silt);}
+@keyframes spin {to {transform:rotate(360deg);}}
+:focus-visible {outline:3px solid var(--graphite); outline-offset:2px;}
+
+.gps-msg {margin:0; font-size:14.5px;}
+.gps-msg.bad {color:var(--laterite); border-left:2px solid var(--laterite); background:var(--panel2);
+  border-radius:0 8px 8px 0; padding:8px 10px;}
+.divider {display:flex; align-items:center; gap:12px; margin:4px 0; color:var(--laterite); font-size:13px;}
+.divider::before, .divider::after {content:""; flex:1; border-top:1px solid var(--ruler);}
+
+.spots {display:grid; gap:8px;}
+.spot {display:grid; grid-template-columns:1fr auto; align-items:center; gap:10px; text-align:left; padding:14px 16px;
+  min-height:56px; border:1px solid var(--ruler); border-radius:14px; background:var(--panel); cursor:pointer; width:100%;}
+.spot small {display:block; font:12px JB,monospace; color:var(--laterite); margin-top:2px;}
+.spot i {width:20px; height:20px; border-radius:99px; border:1.5px solid var(--ruler);}
+.spot[aria-checked="true"] {border-color:var(--graphite); box-shadow:inset 0 0 0 1px var(--graphite);}
+.spot[aria-checked="true"] i {border:6px solid var(--graphite);}
+
+.manual summary {cursor:pointer; font-weight:600; color:var(--laterite); padding:8px 0; min-height:44px;
+  display:flex; align-items:center;}
+.coords {display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;}
+.coords label {display:grid; gap:4px; font-size:13px; font-weight:600; color:var(--laterite);}
+.coords input {min-height:48px; border:1px solid var(--ruler); border-radius:12px; background:var(--panel);
+  padding:0 12px; font:15px JB,monospace; width:100%;}
+.chosen {margin:0; font-size:14px; text-align:center;}
+.chosen b {font-weight:600;}
+
+.film-box {border:1px solid var(--ruler); border-radius:16px; background:var(--panel); padding:16px; overflow:hidden;}
+.film-box video {display:block; width:calc(100% + 32px); margin:-16px; aspect-ratio:16/10; object-fit:cover;
+  background:var(--graphite);}
+.film-box.has-clip {padding:16px;}
+.film-box.has-clip .guide {display:none;}
+
+#readout .readout {border-radius:16px;}
+#verdict .verdict, .eyes {grid-template-columns:1fr;}
+#verdict .numbers b {font-size:40px;}
+#verdict .rungs {grid-template-columns:repeat(2,1fr);}
+#trace .trace {grid-template-columns:1fr;}
+#trace .trace .eye {grid-template-columns:52px 1fr; justify-items:start; text-align:left; width:auto; align-items:center;}
+#trace .stations {grid-template-columns:1fr; padding:10px 0 10px 12px;}
+#trace .stations::before {top:0; bottom:0; left:25px; right:auto; border-top:0; border-left:2.5px dashed var(--graphite);}
+#trace .stations li {grid-template-columns:28px 1fr; justify-items:start; text-align:left; gap:2px 14px; padding:6px 0;}
+#trace .stations li .mark {margin:0; grid-row:span 2;}
+#trace .km {position:static; transform:none; grid-column:2; padding:0; background:none;}
+#eyes {display:grid; gap:14px;}
+#share-buttons:empty {display:none;}
+#share-buttons .hint {text-align:center; margin-top:6px;}
+.chat {max-width:none;}
+
+@media (prefers-reduced-motion: reduce) {*, *::before, *::after {animation:none !important; transition:none !important;}}

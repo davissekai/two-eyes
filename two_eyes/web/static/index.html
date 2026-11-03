@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F2EDE4">
+<meta name="description" content="Film a muddy river. We look upstream from space and show you where the mud comes from.">
+<title>Two Eyes</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/static/icon-192.png">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
+<link rel="stylesheet" href="/page.css">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <button class="back" id="back" type="button" aria-label="Back" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <span class="brand">Two Eyes</span>
+    <ol class="progress" id="progress" aria-label="Steps" hidden>
+      <li></li><li></li><li></li>
+    </ol>
+  </header>
+
+  <!-- 1. Start -->
+  <section class="screen" data-screen="start" aria-labelledby="start-h">
+    <div class="body">
+      <div class="photo start-photo">
+        <img src="/hero.jpg" alt="Aerial view of a bridge over a brown river through forest">
+        <span class="tag">Water · muddy</span>
+        <span class="cap">Photo: Goldenwabbit, Wikimedia Commons, CC BY-SA 4.0</span>
+      </div>
+      <h1 id="start-h" class="display">Film the river.<em>Find the source.</em></h1>
+      <p class="lede">Your phone sees the muddy river. The satellite sees where the mud comes from.</p>
+      <ul class="safe"><li>Public places only</li><li>Location rounded to 1 km</li><li>No name or number kept</li></ul>
+    </div>
+    <div class="actions">
+      <button class="btn primary" type="button" data-go="where">Start a check</button>
+      <p class="fine">About 3 minutes. Works best standing by the river.</p>
+    </div>
+  </section>
+
+  <!-- 2. Where -->
+  <section class="screen" data-screen="where" aria-labelledby="where-h" hidden>
+    <div class="body">
+      <p class="eyebrow">Step 1 of 3</p>
+      <h2 id="where-h" class="title">Where are you?</h2>
+      <p class="sub">Stand somewhere safe and public by the water: a bridge, a bank, a ferry landing.</p>
+      <button class="btn gps" id="gps" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/>
+          <path d="M12 1v4M12 19v4M1 12h4M19 12h4"/></svg>
+        <span><b>Use my location</b><small>Your phone's GPS finds the river you're at</small></span>
+      </button>
+      <p class="gps-msg" id="gps-msg" aria-live="polite" hidden></p>
+
+      <p class="divider"><span>or</span></p>
+      <p class="label">Pick a spot people have checked</p>
+      <div class="spots" id="spots" role="radiogroup" aria-label="Spots people have checked"></div>
+      <details class="manual">
+        <summary>Type coordinates instead</summary>
+        <div class="coords">
+          <label>Latitude<input id="lat" inputmode="decimal" autocomplete="off" placeholder="6.2844"></label>
+          <label>Longitude<input id="lon" inputmode="decimal" autocomplete="off" placeholder="-0.4612"></label>
+        </div>
+        <button class="btn quiet" id="use-coords" type="button">Use these coordinates</button>
+        <p class="gps-msg bad" id="coords-msg" hidden></p>
+      </details>
+    </div>
+    <div class="actions">
+      <p class="chosen" id="chosen" hidden></p>
+      <button class="btn primary" id="to-film" type="button" data-go="film" disabled>Next</button>
+    </div>
+  </section>
+
+  <!-- 3. Film -->
+  <section class="screen" data-screen="film" aria-labelledby="film-h" hidden>
+    <div class="body">
+      <p class="eyebrow">Step 2 of 3</p>
+      <h2 id="film-h" class="title">Film the water</h2>
+      <p class="sub">This is your evidence: it shows the river is muddy today.</p>
+      <div class="film-box" id="film-box">
+        <div class="guide">
+          <div class="phone" aria-hidden="true"><i></i></div>
+          <ul>
+            <li>From a bridge, point down at the water</li>
+            <li>From the bank, aim across at open water, not the muddy edge</li>
+            <li>Keep still for about 10 seconds, in daylight</li>
+            <li>Stay somewhere public. Never walk up to a mine</li>
+          </ul>
+        </div>
+        <video id="clip-preview" playsinline muted loop hidden></video>
+      </div>
+      <p class="gps-msg bad" id="clip-msg" hidden></p>
+    </div>
+    <div class="actions">
+      <label class="btn primary" id="record">
+        <input id="clip" type="file" accept="video/*" capture="environment" hidden>
+        <span id="record-label">Open camera</span>
+      </label>
+      <button class="btn primary" id="check-with-clip" type="button" hidden>Check upstream</button>
+      <button class="btn link" id="skip-clip" type="button">Skip the clip, check without it</button>
+    </div>
+  </section>
+
+  <!-- 4. Checking -->
+  <section class="screen" data-screen="checking" aria-labelledby="checking-h" hidden>
+    <div class="body">
+      <p class="eyebrow">Step 3 of 3</p>
+      <h2 id="checking-h" class="title">Looking upstream</h2>
+      <p class="sub" id="checking-where"></p>
+      <div id="readout"></div>
+      <p class="fine">You can lock your phone. Keep this page open and the result appears here.</p>
+    </div>
+    <div class="actions" id="checking-actions" hidden>
+      <button class="btn primary" type="button" id="retry">Try again</button>
+    </div>
+  </section>
+
+  <!-- 5. Result -->
+  <section class="screen" data-screen="result" aria-labelledby="result-h" hidden>
+    <div class="body">
+      <p class="eyebrow" id="result-h">What we found</p>
+      <div id="verdict"></div>
+      <h3 class="section-title">The evidence</h3>
+      <div id="trace"></div>
+      <div id="eyes"></div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" type="button" data-go="share">Share the evidence card</button>
+      <button class="btn link" type="button" id="again">Check another spot</button>
+    </div>
+  </section>
+
+  <!-- 6. Share -->
+  <section class="screen" data-screen="share" aria-labelledby="share-h" hidden>
+    <div class="body">
+      <p class="eyebrow">Share</p>
+      <h2 id="share-h" class="title">Send it where it counts</h2>
+      <div id="preview"></div>
+      <div id="next-steps"></div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" type="button" id="native-share" hidden>Share the card</button>
+      <div id="share-buttons"></div>
+      <a class="btn quiet" id="save-card" download="two-eyes-evidence-card.png">Save the card</a>
+    </div>
+  </section>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>
