@@ -26,13 +26,15 @@ OUT_ROOT = os.path.join(demo.OUT_DIR, "web")
 MAX_CLIP_BYTES = 80 * 1024 * 1024     # a 10 s phone clip is well under this
 MAX_JOBS = 50                         # finished checks kept in memory; the oldest are dropped
 MAX_RUNNING = 3                       # checks at once; each one calls Earth Engine and the paid models
+MAX_CHECK_SECONDS = 10 * 60           # a check normally takes about 3 minutes; past this it has hung
 FAIL_REASON = "Something went wrong on our side. Check your connection and try again."
 BUSY = "Two Eyes is busy with other checks. Try again in a minute."
+TIMEOUT_REASON = "That check took too long. The satellite service may be slow; try again in a few minutes."
 
 log = logging.getLogger("two_eyes.web")
 
 JOBS = {}
-_LOCK = threading.Lock()
+_LOCK = threading.RLock()    # re-entered: start_check counts running checks while holding it
 
 app = FastAPI(title="Two Eyes", docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
@@ -60,15 +62,39 @@ def _work(job_id, lat, lon, name, clip):
         # The clip is the person's own footage, so it carries no photo credit.
         r = pipeline.run(lat, lon, name=name, clip=clip, clip_credit=None,
                          out_dir=os.path.join(OUT_ROOT, job_id), log=lambda *a: job["lines"].append(" ".join(map(str, a))))
-        job.update(card=r["card_png"], result=_result(job_id, r), state="done")
+        result = _result(job_id, r)
+        with _LOCK:
+            if job["state"] == "running":
+                job.update(card=r["card_png"], result=result, state="done")
     except Exception as ex:
         # The type goes to the server log for us; the person sees a plain reason, never internals.
         log.warning("check %s failed: %s: %s", job_id, type(ex).__name__, ex)
-        job["state"] = "failed"
+        with _LOCK:
+            if job["state"] == "running":
+                job["state"] = "failed"
     finally:
-        job["elapsed"] = time.time() - job["t0"]
+        with _LOCK:
+            if job["elapsed"] is None:
+                job["elapsed"] = time.time() - job["t0"]
+        if job.get("reason") == TIMEOUT_REASON:
+            # Nobody will read a late answer; don't leave its files behind.
+            shutil.rmtree(os.path.join(OUT_ROOT, job_id), ignore_errors=True)
         if clip:
             shutil.rmtree(os.path.dirname(clip), ignore_errors=True)
+
+
+def _give_up_on_hung():
+    """Mark checks past MAX_CHECK_SECONDS as failed so they free their slot.
+
+    A thread can't be stopped from outside, so a hung check keeps waiting in the background;
+    whatever it returns later is ignored (_work only finishes a check that is still running).
+    """
+    now = time.time()
+    with _LOCK:
+        for job_id, job in JOBS.items():
+            if job["state"] == "running" and now - job["t0"] > MAX_CHECK_SECONDS:
+                log.warning("check %s gave up after %.0f s", job_id, now - job["t0"])
+                job.update(state="failed", reason=TIMEOUT_REASON, elapsed=now - job["t0"])
 
 
 def _forget_oldest():
@@ -80,7 +106,9 @@ def _forget_oldest():
 
 
 def _running():
-    return sum(j["state"] == "running" for j in JOBS.values())
+    _give_up_on_hung()
+    with _LOCK:
+        return sum(j["state"] == "running" for j in JOBS.values())
 
 
 async def _save_clip(clip):
@@ -171,10 +199,11 @@ def _job(job_id):
 
 @app.get("/api/checks/{job_id}")
 def check_status(job_id: str):
+    _give_up_on_hung()
     job = _job(job_id)
     lines, state = list(job["lines"]), job["state"]
     if state == "failed":
-        html = readout.html(lines, finished=True, failed=True, reason=FAIL_REASON)
+        html = readout.html(lines, finished=True, failed=True, reason=job.get("reason") or FAIL_REASON)
     else:
         html = readout.html(lines, finished=state == "done", elapsed_s=job["elapsed"])
     return {"state": state, "readout_html": html, "result": job["result"]}

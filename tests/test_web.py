@@ -124,3 +124,23 @@ def test_too_many_checks_at_once_are_turned_away(client, monkeypatch):
     assert second.status_code == 429 and "busy" in second.json()["detail"]
     _wait(client, first.json()["id"])
     assert client.post("/api/checks", data={"lat": 6.28, "lon": -0.46}).status_code == 200
+
+
+def test_a_hung_check_gives_up_frees_its_slot_and_ignores_a_late_answer(client, monkeypatch):
+    release = threading.Event()
+
+    def hung_run(*a, **k):
+        release.wait(10)
+        return {"card_png": "late.png", "share_text": "late"}
+    monkeypatch.setattr(server.pipeline, "run", hung_run)
+    monkeypatch.setattr(server, "_result", lambda job_id, r: {"late": True})
+    monkeypatch.setattr(server, "MAX_RUNNING", 1)
+    monkeypatch.setattr(server, "MAX_CHECK_SECONDS", 0.3)
+    job = client.post("/api/checks", data={"lat": 6.28, "lon": -0.46}).json()
+    body = _wait(client, job["id"], timeout=5)
+    assert body["state"] == "failed" and "too long" in body["readout_html"]
+    assert client.post("/api/checks", data={"lat": 6.28, "lon": -0.46}).status_code == 200
+    release.set()
+    time.sleep(0.3)
+    late = client.get(f"/api/checks/{job['id']}").json()
+    assert late["state"] == "failed" and late["result"] is None
