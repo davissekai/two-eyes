@@ -176,7 +176,9 @@ async def start_check(lat: float = Form(..., ge=-90, le=90), lon: float = Form(.
                       name: str = Form("", max_length=80), clip: Optional[UploadFile] = File(None)):
     if _running() >= MAX_RUNNING:
         raise HTTPException(429, BUSY)
-    path = await _save_clip(clip) if clip is not None else None
+    if clip is None or not getattr(clip, "filename", None):
+        raise HTTPException(400, "Upload a photo or video of the river. Results are computed from your inputs — nothing is preloaded.")
+    path = await _save_clip(clip)
     job_id = uuid.uuid4().hex
     with _LOCK:
         if _running() >= MAX_RUNNING:

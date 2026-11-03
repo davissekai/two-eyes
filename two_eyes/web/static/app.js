@@ -121,17 +121,22 @@ $("clip").addEventListener("change", () => {
   $("record").classList.remove("primary"); $("record").classList.add("quiet");
   $("record-label").textContent = "Film again";
   $("check-with-clip").hidden = false;
-  $("skip-clip").hidden = true;
+  const need = $("need-clip"); if (need) need.hidden = true;
 });
 $("check-with-clip").addEventListener("click", () => startCheck(state.clip));
-$("skip-clip").addEventListener("click", () => startCheck(null));
 
 // --- checking ------------------------------------------------------------------------------------
 
 async function startCheck(clip) {
+  if (!clip) {
+    const msg = $("clip-msg");
+    if (msg) { msg.hidden = false; msg.textContent = "Upload a photo or video of the river first."; }
+    show("film");
+    return;
+  }
   const fd = new FormData();
   fd.append("lat", state.place.lat); fd.append("lon", state.place.lon); fd.append("name", state.place.name);
-  if (clip) fd.append("clip", clip);
+  fd.append("clip", clip);
   state.result = null;
   $("checking-where").textContent = `From ${state.place.name === "Your spot" ? "your spot" : state.place.name}` +
     (clip ? ", with your clip." : ", satellite only.");
@@ -210,7 +215,8 @@ $("again").addEventListener("click", () => {
   $("clip").value = ""; $("clip-preview").hidden = true; $("film-box").classList.remove("has-clip");
   $("record").classList.add("primary"); $("record").classList.remove("quiet");
   $("record-label").textContent = "Open camera";
-  $("check-with-clip").hidden = true; $("skip-clip").hidden = false;
+  $("check-with-clip").hidden = true;
+  const need = $("need-clip"); if (need) need.hidden = false;
   show("where");
 });
 

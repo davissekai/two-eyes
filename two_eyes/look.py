@@ -43,7 +43,7 @@ body {background:BONE !important;}
   --background-fill-secondary:BONE; --block-background-fill:PANEL; --input-background-fill:PANEL;
   --border-color-primary:RULER; color-scheme:light;}
 .gradio-container .plain, .gradio-container .prose {color:GRAPHITE !important;}
-.gradio-container {background:BONE !important; color:GRAPHITE !important; max-width:1120px !important;
+.gradio-container {background:BONE !important; color:GRAPHITE !important; max-width:1280px !important;
   font-family:G,'Geist',Arial,sans-serif !important; padding-bottom:0 !important;}
 .gradio-container h1, .gradio-container h2, .gradio-container h3 {color:GRAPHITE;}
 .gradio-container label {color:LATERITE !important; font-weight:600; background:transparent !important;}
@@ -238,6 +238,32 @@ a.wa {display:inline-flex; align-items:center; justify-content:center; min-heigh
 #footnote {border-top:1px solid RULER; margin-top:30px; padding:18px 4px 26px; font-size:12.5px; line-height:1.55; color:LATERITE;}
 
 :focus-visible {outline:3px solid GRAPHITE; outline-offset:2px;}
+/* empty state (no brief until real inputs) */
+.empty-state {border:1.5px dashed RULER; border-radius:16px; padding:28px 22px; background:PANEL;
+  margin:4px 0 8px;}
+.empty-state .mono {color:LATERITE; margin:0 0 8px;}
+.empty-state h3 {font-family:IS,'Instrument Serif',serif; font-weight:400; font-size:32px;
+  line-height:1.1; margin:0 0 10px; color:GRAPHITE;}
+.empty-state p {margin:0 0 14px; color:GRAPHITE; max-width:42ch; line-height:1.45;}
+.empty-state ol {margin:0; padding-left:1.2em; color:LATERITE; display:grid; gap:6px;}
+
+/* desktop: inputs left, results right */
+#workspace {align-items:start !important; gap:28px !important;}
+#col-inputs, #col-results {min-width:0 !important;}
+@media (min-width:900px) {
+  .gradio-container {padding-left:24px !important; padding-right:24px !important;}
+  #workspace {flex-wrap:nowrap !important;}
+  #col-inputs {flex:0 0 46% !important; max-width:46% !important;}
+  #col-results {flex:1 1 50% !important; max-width:54% !important;
+    position:sticky; top:12px; align-self:start;}
+  #row-input {flex-direction:column !important;}
+  #row-input > div {min-width:100% !important;}
+}
+@media (max-width:899px) {
+  #workspace {flex-wrap:wrap !important;}
+  #col-inputs, #col-results {flex:1 1 100% !important; max-width:100% !important;}
+}
+
 @media (max-width:820px) {
   .hero, .verdict, .eyes {grid-template-columns:1fr;}
   .hero .photo-col {order:-1;}

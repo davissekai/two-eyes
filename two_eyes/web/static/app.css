@@ -14,11 +14,42 @@ body {font:16px/1.45 G,'Geist',system-ui,sans-serif; -webkit-font-smoothing:anti
 button, input {font:inherit; color:inherit;}
 img {max-width:100%;}
 
-/* On a big screen the app sits in a phone-width column, like an app, not a stretched page. */
+/* Narrow: phone column. Wide: desktop shell with multi-column screens. */
 .app {max-width:480px; margin:0 auto; min-height:100dvh; display:flex; flex-direction:column; position:relative;}
 @media (min-width:600px) {
   body {background:var(--panel2);}
   .app {background:var(--bone); box-shadow:0 0 0 1px var(--ruler), 0 30px 80px rgba(21,19,15,.12);}
+}
+@media (min-width:900px) {
+  .app {max-width:1100px; border-radius:18px; margin:24px auto; min-height:calc(100dvh - 48px);
+    overflow:hidden;}
+  .screen[data-screen="where"] .body,
+  .screen[data-screen="film"] .body {
+    display:grid; grid-template-columns:1fr 1fr; gap:24px 32px; align-content:start;}
+  .screen[data-screen="where"] .body > .eyebrow,
+  .screen[data-screen="where"] .body > .title,
+  .screen[data-screen="where"] .body > .sub,
+  .screen[data-screen="film"] .body > .eyebrow,
+  .screen[data-screen="film"] .body > .title,
+  .screen[data-screen="film"] .body > .sub {grid-column:1 / -1;}
+  .screen[data-screen="result"] .body {
+    display:grid; grid-template-columns:minmax(280px, 1fr) minmax(320px, 1.15fr); gap:20px 28px;}
+  .screen[data-screen="result"] .body > .eyebrow,
+  .screen[data-screen="result"] .body > .section-title {grid-column:1 / -1;}
+  .screen[data-screen="result"] #verdict {grid-column:1; grid-row:2 / span 2;}
+  .screen[data-screen="result"] #trace {grid-column:2; grid-row:2;}
+  .screen[data-screen="result"] #eyes {grid-column:2; grid-row:3;}
+  .screen[data-screen="share"] .body {
+    display:grid; grid-template-columns:1fr 1fr; gap:24px 32px; align-content:start;}
+  .screen[data-screen="share"] .body > .eyebrow,
+  .screen[data-screen="share"] .body > .title,
+  .screen[data-screen="share"] .body > .sub {grid-column:1 / -1;}
+  .actions {grid-template-columns:1fr 1fr; align-items:center;}
+  .actions .btn.primary {grid-column:auto;}
+  .actions label.btn.primary {grid-column:1 / -1;}
+}
+@media (max-width:899px) {
+  .app {max-width:480px;}
 }
 
 .topbar {position:sticky; top:0; z-index:5; display:grid; grid-template-columns:44px 1fr auto; align-items:center;

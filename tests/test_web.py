@@ -14,6 +14,11 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from two_eyes.web import server  # noqa: E402
 
+def _clip_files():
+    return {"clip": ("river.mp4", b"fake-bytes", "video/mp4")}
+
+
+
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
@@ -46,7 +51,7 @@ def test_spots_people_have_checked_are_listed(client):
 
 
 def test_a_check_runs_to_a_result_with_a_card(client):
-    job = client.post("/api/checks", data={"lat": 6.28442, "lon": -0.46118}).json()
+    job = client.post("/api/checks", data={"lat": 6.28442, "lon": -0.46118}, files=_clip_files()).json()
     body = _wait(client, job["id"])
     assert body["state"] == "done"
     res = body["result"]
@@ -56,7 +61,7 @@ def test_a_check_runs_to_a_result_with_a_card(client):
 
 
 def test_progress_is_readable_while_running(client):
-    job = client.post("/api/checks", data={"lat": 6.28442, "lon": -0.46118}).json()
+    job = client.post("/api/checks", data={"lat": 6.28442, "lon": -0.46118}, files=_clip_files()).json()
     first = client.get(f"/api/checks/{job['id']}").json()
     assert "readout" in first["readout_html"]
     _wait(client, job["id"])
@@ -77,7 +82,7 @@ def test_a_failed_check_says_so_without_leaking_internals(client, monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("secret internal path C:/x")
     monkeypatch.setattr(server.pipeline, "run", boom)
-    job = client.post("/api/checks", data={"lat": 6.28442, "lon": -0.46118}).json()
+    job = client.post("/api/checks", data={"lat": 6.28442, "lon": -0.46118}, files=_clip_files()).json()
     body = _wait(client, job["id"])
     assert body["state"] == "failed" and "didn't finish" in body["readout_html"]
     assert "secret internal path" not in body["readout_html"]
@@ -117,13 +122,13 @@ def test_too_many_checks_at_once_are_turned_away(client, monkeypatch):
         raise RuntimeError("done waiting")
     monkeypatch.setattr(server.pipeline, "run", slow_run)
     monkeypatch.setattr(server, "MAX_RUNNING", 1)
-    first = client.post("/api/checks", data={"lat": 6.28, "lon": -0.46})
-    second = client.post("/api/checks", data={"lat": 6.28, "lon": -0.46})
+    first = client.post("/api/checks", data={"lat": 6.28, "lon": -0.46}, files=_clip_files())
+    second = client.post("/api/checks", data={"lat": 6.28, "lon": -0.46}, files=_clip_files())
     release.set()
     assert first.status_code == 200
     assert second.status_code == 429 and "busy" in second.json()["detail"]
     _wait(client, first.json()["id"])
-    assert client.post("/api/checks", data={"lat": 6.28, "lon": -0.46}).status_code == 200
+    assert client.post("/api/checks", data={"lat": 6.28, "lon": -0.46}, files=_clip_files()).status_code == 200
 
 
 def test_a_hung_check_gives_up_frees_its_slot_and_ignores_a_late_answer(client, monkeypatch):
@@ -136,11 +141,24 @@ def test_a_hung_check_gives_up_frees_its_slot_and_ignores_a_late_answer(client, 
     monkeypatch.setattr(server, "_result", lambda job_id, r: {"late": True})
     monkeypatch.setattr(server, "MAX_RUNNING", 1)
     monkeypatch.setattr(server, "MAX_CHECK_SECONDS", 0.3)
-    job = client.post("/api/checks", data={"lat": 6.28, "lon": -0.46}).json()
+    job = client.post("/api/checks", data={"lat": 6.28, "lon": -0.46}, files=_clip_files()).json()
     body = _wait(client, job["id"], timeout=5)
     assert body["state"] == "failed" and "too long" in body["readout_html"]
-    assert client.post("/api/checks", data={"lat": 6.28, "lon": -0.46}).status_code == 200
+    assert client.post("/api/checks", data={"lat": 6.28, "lon": -0.46}, files=_clip_files()).status_code == 200
     release.set()
     time.sleep(0.3)
     late = client.get(f"/api/checks/{job['id']}").json()
     assert late["state"] == "failed" and late["result"] is None
+
+
+def test_check_without_clip_is_refused(client):
+    r = client.post("/api/checks", data={"lat": 6.28442, "lon": -0.46118})
+    assert r.status_code == 400
+    assert "preloaded" in r.json()["detail"].lower() or "photo or video" in r.json()["detail"].lower()
+
+
+def test_desktop_css_is_wider_than_phone(client):
+    css = client.get("/static/app.css").text
+    assert "max-width:1100px" in css or "max-width: 1100px" in css
+    assert "@media (min-width:900px)" in css or "@media (min-width: 900px)" in css
+    assert "max-width:480px" in css  # mobile shell kept
