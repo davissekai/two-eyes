@@ -256,10 +256,18 @@ a.wa {display:inline-flex; align-items:center; justify-content:center; min-heigh
 """
 
 
-def build_css():
-    """Full page CSS: Gradio restyle + case-file components, with the brand tokens filled in."""
-    css = _GRADIO + _PAGE
+def _fill(css):
     for name, value in [("GRAPHITE", GRAPHITE), ("BONE", BONE), ("PANEL2", PANEL2), ("PANEL", PANEL),
                         ("SILT", SILT), ("LATERITE", LATERITE), ("LIME", LIME), ("RULER", RULER), ("WA", WA)]:
         css = css.replace(name, value)
-    return css + _font_faces()
+    return css
+
+
+def build_css():
+    """Full page CSS: Gradio restyle + case-file components, with the brand tokens filled in."""
+    return _fill(_GRADIO + _PAGE) + _font_faces()
+
+
+def page_css():
+    """Case-file components and fonts only, for the phone app, which has no Gradio to restyle."""
+    return _fill(_PAGE) + _font_faces()
