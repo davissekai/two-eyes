@@ -1,4 +1,5 @@
 """The ground eye: SAM 3.1 finds the river water in the citizen's clip; we read its colour."""
+import json
 import os
 import subprocess
 import tempfile
@@ -12,11 +13,26 @@ def prepare_clip(src, dst=None):
     """Re-encode to H.264 MP4, CLIP_FPS frames/s, CLIP_WIDTH wide, at most CLIP_MAX_S seconds, no audio,
     and no metadata (strips the phone's GPS tags)."""
     dst = dst or os.path.join(tempfile.mkdtemp(), "clip.mp4")
-    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-i", src, "-t", str(C.CLIP_MAX_S),
+    # A photo becomes a short still clip, so the same SAM 3.1 video path reads it.
+    head = ["-loop", "1", "-t", str(C.STILL_CLIP_S)] if is_still_image(src) else []
+    cmd = ["ffmpeg", "-y", "-loglevel", "error", *head, "-i", src, "-t", str(C.CLIP_MAX_S),
            "-vf", f"fps={C.CLIP_FPS},scale={C.CLIP_WIDTH}:-2", "-an", "-map_metadata", "-1",
            "-c:v", "libx264", "-pix_fmt", "yuv420p", dst]
     subprocess.run(cmd, check=True)
     return dst
+
+
+def is_still_image(path):
+    """True for a single photo (JPEG, PNG, HEIC, WebP...), False for a video or anything unreadable."""
+    try:
+        out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                              "stream=codec_name,nb_frames:format=format_name", "-of", "json", path],
+                             capture_output=True, text=True, timeout=30)
+        info = json.loads(out.stdout or "{}")
+    except Exception:
+        return False
+    fmt = (info.get("format") or {}).get("format_name", "")
+    return fmt == "image2" or fmt.endswith("_pipe")
 
 
 def read_frames(mp4):
@@ -138,7 +154,7 @@ def analyse_clip(src, use_sam=True, use_vlm=True, privacy_blur=True):
     if privacy_blur:
         from . import privacy
         # Fail closed: PrivacyBlurError propagates — caller must not share the unblurred clip.
-        mp4 = privacy.blur_clip(mp4)
+        mp4 = privacy.blur_clip(mp4, prepared=True)
     frames = read_frames(mp4)
     if not frames:
         raise ValueError("Could not read any frames from the clip.")

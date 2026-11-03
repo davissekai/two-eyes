@@ -18,7 +18,7 @@ def _client():
     key = os.environ.get("MODEL_API_KEY")
     if not key:
         raise RuntimeError("MODEL_API_KEY is not set")
-    return OpenAI(base_url=C.META_BASE_URL, api_key=key)
+    return OpenAI(base_url=C.META_BASE_URL, api_key=key, timeout=C.META_TIMEOUT_S, max_retries=2)
 
 
 def _img_url(rgb, quality=85):
@@ -28,8 +28,11 @@ def _img_url(rgb, quality=85):
     return "data:image/jpeg;base64," + base64.b64encode(raw).decode(), hashlib.sha256(raw).hexdigest()
 
 
-def respond(prompt, images=None, schema_name=None, cache_tag=""):
-    """Cached Muse Spark call. images: list of RGB uint8 arrays. Returns output_text."""
+def respond(prompt, images=None, schema_name=None, cache_tag="", effort=None):
+    """Cached Muse Spark call. images: list of RGB uint8 arrays. Returns output_text.
+
+    effort: reasoning effort ("minimal", "low", ...) for short, tightly checked tasks; None = model default.
+    """
     images = images or []
     digests = []
     content = [{"type": "input_text", "text": prompt}]
@@ -37,14 +40,18 @@ def respond(prompt, images=None, schema_name=None, cache_tag=""):
         url, dig = _img_url(im)
         digests.append(dig)
         content.append({"type": "input_image", "image_url": url})
-    key = meta_cache.make_key("muse", C.TEXT_MODEL, cache_tag or schema_name or "free", prompt, *digests)
+    key = meta_cache.make_key("muse", C.TEXT_MODEL, cache_tag or schema_name or "free", prompt, *digests,
+                             *([f"effort:{effort}"] if effort else []))
     hit = meta_cache.get(key)
     if hit is not None and "output_text" in hit:
         return hit["output_text"] or ""
-    resp = _client().responses.create(
-        model=C.TEXT_MODEL,
-        input=[{"type": "message", "role": "user", "content": content}],
-    )
+    extra = {"reasoning": {"effort": effort}} if effort else {}
+    with meta_cache.SLOTS:
+        resp = _client().responses.create(
+            model=C.TEXT_MODEL,
+            input=[{"type": "message", "role": "user", "content": content}],
+            **extra,
+        )
     text = resp.output_text or ""
     meta_cache.put(key, {"output_text": text, "model": C.TEXT_MODEL, "tag": cache_tag or schema_name})
     meta_cache.bump_calls(1)

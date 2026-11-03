@@ -5,11 +5,12 @@ Code deletes any sentence whose check did not pass. A minimum card always surviv
 location, NDVI change, and 'Likely source, not proven'.
 """
 import json
+import re
 
 from . import config as C
 from . import muse
 
-CARD_WRITER_VERSION = "1"
+CARD_WRITER_VERSION = "2"
 
 CARD_WRITER_PROMPT = """You write a short WhatsApp evidence card for a Ghana river-monitoring app.
 You receive the check results as JSON. Write 2–5 sentences. EACH sentence MUST start with a
@@ -19,7 +20,10 @@ Allowed tags: [A] [B] [C] [D] [E] [F] [GROUND] [MIN].
 Rules:
 - Only write a tagged sentence when that check passed (pass == true). For unknown/null/false, do not write that tag (except [MIN]).
 - [MIN] sentences are the minimum card and always allowed: name the location, state the NDVI change if given, and end with exactly: Likely source, not proven.
-- No percentages. No accusations against named people. No Twi. Plain English.
+- No percentages. No accusations against named people. No Twi. Plain English for someone with no science
+  background: say what the satellite saw and where the water goes.
+- The tag is only for the app. Never mention checks, check letters, "passed", "pass" or the JSON inside the
+  sentence text itself.
 - Return ONLY JSON: {"sentences": ["[A] ...", "[MIN] ...", ...]}
 """
 
@@ -33,13 +37,26 @@ def _check_passed(checks, tag):
     return c.get("pass") is True
 
 
+def _public_spot(r):
+    """The filming spot as others may see it: name plus coordinates rounded to about 1 km (privacy)."""
+    from .card import public_point
+    b = dict(r.get("spot") or r.get("bridge") or {})
+    if (b.get("name") or "").strip().lower() in ("", "your spot"):
+        b["name"] = "the filming spot"     # a placeholder, not a place name: never write "at Your spot"
+    if b.get("lat") is not None and b.get("lon") is not None:
+        b["lat"], b["lon"] = public_point(b["lat"], b["lon"])
+    return b
+
+
 def minimum_card(r):
     """Always-surviving lines: location, NDVI change when present, caution."""
-    b = r.get("spot") or r.get("bridge") or {}
+    b = _public_spot(r)
     s = r.get("scar") or {}
-    name = b.get("name") or "this bridge"
-    loc = f"{b.get('lat', 0):.4f}, {b.get('lon', 0):.4f}"
-    lines = [f"Location: {name} ({loc})."]
+    name = b.get("name") or "the filming spot"
+    if b.get("lat") is not None and b.get("lon") is not None:
+        lines = [f"Location: {name} (about {b['lat']:.2f}, {b['lon']:.2f})."]
+    else:
+        lines = [f"Location: {name}."]
     if s.get("ndvi_before") is not None and s.get("ndvi_after") is not None:
         lines.append(
             f"NDVI dropped from {s['ndvi_before']:.2f} to {s['ndvi_after']:.2f}"
@@ -52,6 +69,9 @@ def minimum_card(r):
     return lines
 
 
+_JARGON = re.compile(r"\bchecks?\s+[A-F]\b|\bpass(ed)?\b|\bcheck\s+(result|passed)", re.I)
+
+
 def _filter_sentences(sentences, checks, allow_ground=True):
     kept = []
     for s in sentences or []:
@@ -60,7 +80,7 @@ def _filter_sentences(sentences, checks, allow_ground=True):
             continue
         tag = s[1:s.index("]")].strip().upper()
         body = s[s.index("]") + 1:].strip()
-        if not body:
+        if not body or _JARGON.search(body):
             continue
         if tag == "GROUND" and not allow_ground:
             continue
@@ -78,7 +98,7 @@ def write_card(r, use_llm=True):
     ground = r.get("ground") or {}
     allow_ground = bool(ground.get("water_found"))
     payload = {
-        "bridge": r.get("spot") or r.get("bridge"),
+        "bridge": _public_spot(r),
         "scar": {k: (r.get("scar") or {}).get(k)
                  for k in ("area_ha", "distance_km", "ndvi_before", "ndvi_after", "lat", "lon")},
         "checks": {k: {"pass": (checks.get(k) or {}).get("pass"),
@@ -93,7 +113,7 @@ def write_card(r, use_llm=True):
     if use_llm and C.SHARE_LLM:
         try:
             prompt = CARD_WRITER_PROMPT + "\n\nCheck results:\n" + json.dumps(payload)
-            text = muse.respond(prompt, cache_tag=f"card_writer_v{CARD_WRITER_VERSION}")
+            text = muse.respond(prompt, cache_tag=f"card_writer_v{CARD_WRITER_VERSION}", effort=C.CARD_WRITER_EFFORT)
             data = muse.parse_json(text)
             sentences = _filter_sentences(data.get("sentences"), checks, allow_ground=allow_ground)
             muse_ok = True

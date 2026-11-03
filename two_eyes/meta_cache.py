@@ -71,3 +71,9 @@ def get_calls():
         return int(json.load(open(path)).get("calls", 0))
     except Exception:
         return 0
+
+
+# At most this many Meta API calls in flight across every check on the server, so several checks at once
+# queue politely instead of tripping the API's rate limit. Calls past the cap wait their turn.
+import threading as _threading
+SLOTS = _threading.BoundedSemaphore(int(os.environ.get("TWO_EYES_META_CONCURRENCY", "12")))

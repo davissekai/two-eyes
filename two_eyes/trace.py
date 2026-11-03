@@ -3,6 +3,10 @@ from . import config as C
 from .earth import ee
 
 
+class NoRiverHere(ValueError):
+    """The spot is not inside any river basin (open sea, a big lake, a bad coordinate). Plain message."""
+
+
 class Basins:
     """HydroBASINS level-12 basins around a point, with upstream/downstream walks."""
 
@@ -19,7 +23,11 @@ class Basins:
     def basin_of(self, lat, lon):
         E = ee()
         f = self.fc.filterBounds(E.Geometry.Point([lon, lat])).first()
-        return f.get("HYBAS_ID").getInfo()
+        found = E.Algorithms.If(f, f.get("HYBAS_ID"), None).getInfo()
+        if found is None:
+            raise NoRiverHere("We couldn't find land that drains to a river at this spot. "
+                              "Check the location: stand by a river, on land.")
+        return found
 
     def upstream(self, start):
         return upstream_ids(start, self._up)

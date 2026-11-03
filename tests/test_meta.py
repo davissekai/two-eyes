@@ -31,7 +31,7 @@ def test_card_muse_minimum_survives_all_checks_fail():
     }
     # Force filter path with fake Muse sentences that all name failing checks
     sentences = ["[A] Big scar.", "[D] Mining pits.", "[GROUND] Muddy water.",
-                 "[MIN] Location: Test bridge (6.0000, -1.0000).",
+                 "[MIN] Location: Test bridge (about 6.00, -1.00).",
                  "[MIN] NDVI dropped from 0.70 to 0.20 over about 3.0 ha.",
                  "[MIN] Likely source, not proven."]
     kept = card_muse._filter_sentences(sentences, r["checks"], allow_ground=False)
@@ -120,3 +120,25 @@ def test_share_text_uses_card_muse_when_llm(monkeypatch):
     r = demo.demo_report()
     out = card.share_text(r, use_llm=True)
     assert called.get("ok") and "Likely source, not proven" in out
+
+
+def test_minimum_card_rounds_the_spot_to_about_1km():
+    from two_eyes import card_muse
+    r = {"spot": {"name": "My bridge", "lat": 6.284423, "lon": -0.461187}, "scar": {}}
+    line = card_muse.minimum_card(r)[0]
+    assert "6.28" in line and "-0.46" in line and "6.2844" not in line and "My bridge" in line
+
+
+def test_card_writer_drops_sentences_that_leak_check_jargon():
+    from two_eyes import card_muse
+    checks = {"A": {"pass": True}, "B": {"pass": True}}
+    kept = card_muse._filter_sentences(
+        ["[A] Check A passed.", "[B] The clearing drains to the filming spot.", "[MIN] Likely source, not proven."],
+        checks)
+    assert "Check A passed." not in kept and "The clearing drains to the filming spot." in kept
+
+
+def test_unnamed_spot_is_called_the_filming_spot():
+    from two_eyes import card_muse
+    line = card_muse.minimum_card({"spot": {"name": "Your spot", "lat": 5.65, "lon": -0.28}, "scar": {}})[0]
+    assert "Your spot" not in line and "the filming spot" in line

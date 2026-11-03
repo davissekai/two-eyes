@@ -37,16 +37,23 @@ def _blur_box(frame, box, ksize=51):
     return frame
 
 
+def _one_prompt(rgb, prompt):
+    try:
+        return sam.concept_boxes(rgb, prompt)[0], None
+    except Exception as ex:
+        return [], f"{prompt}:{type(ex).__name__}"
+
+
 def detect_privacy_boxes(rgb):
-    """Run face then license-plate concept prompts (one call each). Returns list of boxes."""
+    """Run the face and license-plate concept prompts (one call each, side by side). Returns boxes."""
+    from concurrent.futures import ThreadPoolExecutor
     boxes = []
     errors = []
-    for prompt in PRIVACY_PROMPTS:
-        try:
-            b, _mask = sam.concept_boxes(rgb, prompt)
+    with ThreadPoolExecutor(max_workers=len(PRIVACY_PROMPTS)) as ex:
+        for b, err in ex.map(lambda p: _one_prompt(rgb, p), PRIVACY_PROMPTS):
             boxes.extend(b)
-        except Exception as ex:
-            errors.append(f"{prompt}:{type(ex).__name__}")
+            if err:
+                errors.append(err)
     if errors and not boxes:
         raise PrivacyBlurError("privacy detection failed: " + ", ".join(errors))
     if errors:
@@ -67,19 +74,22 @@ def blur_frames(frames):
     return out
 
 
-def blur_clip(src_mp4, dst_mp4=None, sample_every=1):
+def blur_clip(src_mp4, dst_mp4=None, sample_every=1, prepared=False):
     """Read clip, blur sampled frames' privacy regions, write a new mp4. Fail closed."""
     from .ground import read_frames, prepare_clip
-    clean = prepare_clip(src_mp4)   # also strips metadata
+    clean = src_mp4 if prepared else prepare_clip(src_mp4)   # prepare_clip also strips metadata
     frames = read_frames(clean)
     if not frames:
         raise PrivacyBlurError("could not read frames for privacy blur")
     # Sample: every sample_every frame (default all prepared frames — already 1 fps)
     sampled_idx = list(range(0, len(frames), max(1, sample_every)))
     blurred = frames[:]
+    from concurrent.futures import ThreadPoolExecutor
     try:
-        for i in sampled_idx:
-            boxes = detect_privacy_boxes(frames[i])
+        # Frames are independent, so their Meta calls run side by side (was ~20 calls in a row).
+        with ThreadPoolExecutor(max_workers=C.PRIVACY_WORKERS) as ex:
+            found = list(ex.map(lambda i: detect_privacy_boxes(frames[i]), sampled_idx))
+        for i, boxes in zip(sampled_idx, found):
             img = frames[i].copy()
             for box in boxes:
                 _blur_box(img, box)

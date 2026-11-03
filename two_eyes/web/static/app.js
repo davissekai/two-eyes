@@ -105,23 +105,59 @@ $("use-coords").addEventListener("click", () => {
 
 // --- film ----------------------------------------------------------------------------------------
 
+// A desktop has no camera button to press: say "choose" instead of "film".
+const DESKTOP = window.matchMedia && matchMedia("(hover: hover) and (pointer: fine)").matches;
+const PICK_LABEL = DESKTOP ? "Choose a video or photo" : "Open camera";
+const AGAIN_LABEL = DESKTOP ? "Choose another" : "Film again";
+$("record-label").textContent = PICK_LABEL;
+
+const VIDEO_EXT = /\.(mp4|mov|m4v|3gp|webm|mkv|avi)$/i, PHOTO_EXT = /\.(jpe?g|png|webp|heic|heif)$/i;
+function kindOf(f) {
+  if (f.type.startsWith("video/") || (!f.type && VIDEO_EXT.test(f.name))) return "video";
+  if (f.type.startsWith("image/") || (!f.type && PHOTO_EXT.test(f.name))) return "photo";
+  return null;
+}
+
+function resetClip() {
+  state.clip = null;
+  $("clip").value = "";
+  const v = $("clip-preview"), im = $("photo-preview");
+  if (v.src) { URL.revokeObjectURL(v.src); v.removeAttribute("src"); }
+  if (im.src) { URL.revokeObjectURL(im.src); im.removeAttribute("src"); }
+  v.hidden = true; im.hidden = true;
+  $("film-box").classList.remove("has-clip");
+  $("record").classList.add("primary"); $("record").classList.remove("quiet");
+  $("record-label").textContent = PICK_LABEL;
+  $("check-with-clip").hidden = true;
+  $("need-clip").hidden = false;
+  message($("clip-msg"), "");
+}
+
 $("clip").addEventListener("change", () => {
   const f = $("clip").files[0];
   if (!f) return;
-  if (!f.type.startsWith("video/")) return message($("clip-msg"), "That isn't a video. Film the water and try again.", true);
+  const kind = kindOf(f);
+  if (!kind) { resetClip(); return message($("clip-msg"), "That isn't a video or a photo. Film the water and try again.", true); }
+  if (f.size === 0) { resetClip(); return message($("clip-msg"), "That file is empty. Film the water again.", true); }
   if (f.size > MAX_CLIP_MB * 1024 * 1024) {
+    resetClip();
     return message($("clip-msg"), "That clip is too long. Ten seconds of video is enough.", true);
   }
   message($("clip-msg"), "");
   state.clip = f;
-  const v = $("clip-preview");
-  if (v.src) URL.revokeObjectURL(v.src);
-  v.src = URL.createObjectURL(f); v.hidden = false; v.play().catch(() => {});
+  const v = $("clip-preview"), im = $("photo-preview");
+  if (v.src) { URL.revokeObjectURL(v.src); v.removeAttribute("src"); }
+  if (im.src) { URL.revokeObjectURL(im.src); im.removeAttribute("src"); }
+  if (kind === "video") {
+    im.hidden = true; v.src = URL.createObjectURL(f); v.hidden = false; v.play().catch(() => {});
+  } else {
+    v.hidden = true; im.src = URL.createObjectURL(f); im.hidden = false;
+  }
   $("film-box").classList.add("has-clip");
   $("record").classList.remove("primary"); $("record").classList.add("quiet");
-  $("record-label").textContent = "Film again";
+  $("record-label").textContent = AGAIN_LABEL;
   $("check-with-clip").hidden = false;
-  const need = $("need-clip"); if (need) need.hidden = true;
+  $("need-clip").hidden = true;
 });
 $("check-with-clip").addEventListener("click", () => startCheck(state.clip));
 
@@ -130,7 +166,7 @@ $("check-with-clip").addEventListener("click", () => startCheck(state.clip));
 async function startCheck(clip) {
   if (!clip) {
     const msg = $("clip-msg");
-    if (msg) { msg.hidden = false; msg.textContent = "Upload a photo or video of the river first."; }
+    if (msg) { msg.hidden = false; msg.textContent = "Film the water first, or take a photo of it."; }
     show("film");
     return;
   }
@@ -138,15 +174,21 @@ async function startCheck(clip) {
   fd.append("lat", state.place.lat); fd.append("lon", state.place.lon); fd.append("name", state.place.name);
   fd.append("clip", clip);
   state.result = null;
-  $("checking-where").textContent = `From ${state.place.name === "Your spot" ? "your spot" : state.place.name}` +
-    (clip ? ", with your clip." : ", satellite only.");
-  $("readout").innerHTML = "";
+  $("checking-where").textContent = `From ${state.place.name === "Your spot" ? "your spot" : state.place.name}, with your ` +
+    (kindOf(clip) === "photo" ? "photo." : "clip.");
+  $("readout").innerHTML = '<div class="readout"><p class="fine">Sending your clip…</p></div>';
   $("checking-actions").hidden = true;
   show("checking");
   try {
     const r = await fetch("/api/checks", {method: "POST", body: fd});
-    const body = await r.json();
-    if (!r.ok) throw new Error(typeof body.detail === "string" ? body.detail : "That didn't work.");
+    let body = {};
+    try { body = await r.json(); } catch (e) { /* a proxy error page, not our JSON */ }
+    if (!r.ok) {
+      const plain = {413: "That clip is too big. Ten seconds of video is enough.",
+        429: "Two Eyes is busy with other checks. Try again in a minute."}[r.status];
+      throw new Error(typeof body.detail === "string" ? body.detail
+        : plain || "Two Eyes couldn't start the check. Try again in a minute.");
+    }
     state.jobId = body.id;
     sessionStorage.setItem("twoEyesJob", JSON.stringify({id: body.id, place: state.place}));
     poll();
@@ -161,6 +203,11 @@ function failed(text) {
   $("checking-actions").hidden = false;
 }
 $("retry").addEventListener("click", () => startCheck(state.clip));
+$("change-spot").addEventListener("click", () => {
+  sessionStorage.removeItem("twoEyesJob");
+  Object.assign(state, {jobId: null, result: null});
+  show("where");
+});
 
 // Poll the check; a dropped connection just waits and tries again, the check keeps running on the server.
 async function poll() {
@@ -211,12 +258,8 @@ $("native-share").addEventListener("click", async () => {
 
 $("again").addEventListener("click", () => {
   sessionStorage.removeItem("twoEyesJob");
-  Object.assign(state, {clip: null, jobId: null, result: null});
-  $("clip").value = ""; $("clip-preview").hidden = true; $("film-box").classList.remove("has-clip");
-  $("record").classList.add("primary"); $("record").classList.remove("quiet");
-  $("record-label").textContent = "Open camera";
-  $("check-with-clip").hidden = true;
-  const need = $("need-clip"); if (need) need.hidden = false;
+  Object.assign(state, {jobId: null, result: null});
+  resetClip();
   show("where");
 });
 
