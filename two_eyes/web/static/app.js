@@ -254,7 +254,7 @@ async function poll() {
 
 function showResult(res) {
   state.result = res;
-  for (const k of ["verdict", "trace", "eyes", "preview"]) $(k).innerHTML = res[k] || "";
+  for (const k of ["verdict", "trace", "eyes", "links", "preview"]) $(k).innerHTML = res[k] || "";
   $("next-steps").innerHTML = res.next_steps || "";
   $("share-buttons").innerHTML = res.share_html || "";
   $("save-card").href = res.card_url;

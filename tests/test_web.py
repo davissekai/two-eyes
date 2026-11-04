@@ -56,6 +56,7 @@ def test_a_check_runs_to_a_result_with_a_card(client):
     assert body["state"] == "done"
     res = body["result"]
     assert "verdict" in res["verdict"] and res["share_text"] and "wa.me" in res["share_html"]
+    assert "Check it yourself" in res["links"]
     card = client.get(res["card_url"])
     assert card.status_code == 200 and card.headers["content-type"] == "image/png"
 

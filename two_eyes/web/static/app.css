@@ -186,3 +186,12 @@ img {max-width:100%;}
 
 /* headings get focus on each screen change for screen readers; no box around them for sighted users */
 [tabindex="-1"]:focus {outline:none;}
+
+/* Check it yourself: outside sources, each a full-width tap target that leaves the app. */
+.check-links ul {list-style:none; margin:10px 0 0; padding:0; display:grid; gap:8px;}
+.check-links a {display:grid; grid-template-columns:1fr auto; align-items:center; gap:2px 12px; min-height:56px;
+  padding:12px 14px; border:1px solid var(--ruler); border-radius:12px; background:var(--bone);
+  color:var(--graphite); text-decoration:none;}
+.check-links a::after {content:"↗"; grid-row:span 2; grid-column:2; font-size:18px; color:var(--laterite);}
+.check-links a:active {transform:scale(.985);}
+.check-links small {grid-column:1; font-size:13px; color:var(--laterite);}
