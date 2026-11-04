@@ -49,6 +49,15 @@ function setPlace(place, how) {
 
 const GPS_IDLE = ["Use my location", "Your phone's GPS finds the river you're at"];
 const ROUGH_FIX_M = 1000;
+// Bumped on every GPS ask and every manual pick; a GPS answer only counts if nothing came after its ask.
+let gpsTicket = 0;
+
+// Drops any GPS answer still on its way and resets the button, because the person chose a place by hand.
+function cancelGps() {
+  gpsTicket += 1;
+  gpsState("idle");
+  message($("gps-msg"), "");
+}
 
 // Puts the GPS button in one of its states: idle, busy (looking) or ok (found, showing where and how close).
 function gpsState(kind, [title, sub] = GPS_IDLE) {
@@ -76,9 +85,11 @@ $("gps").addEventListener("click", () => {
   if (!navigator.geolocation || !window.isSecureContext) {
     return message(msg, "This page can't use your location (it needs a secure https link). Pick a spot below.", true);
   }
+  const ticket = ++gpsTicket;
   gpsState("busy", ["Finding you…", "Hold on, this can take a few seconds"]);
   message(msg, "");
   navigator.geolocation.getCurrentPosition((p) => {
+    if (ticket !== gpsTicket) return;
     const c = p.coords;
     setPlace({lat: c.latitude, lon: c.longitude, name: "Your spot"}, "your GPS position");
     gpsState("ok", ["Location found",
@@ -86,6 +97,7 @@ $("gps").addEventListener("click", () => {
     message(msg, c.accuracy >= ROUGH_FIX_M
       ? "That's a rough fix. If you can, step into the open and tap again, or pick a spot below." : "");
   }, (e) => {
+    if (ticket !== gpsTicket) return;
     gpsState("idle");
     message(msg, e.code === 1
       ? "Location is blocked. Allow location for this site in your browser settings, or pick a spot below."
@@ -103,7 +115,7 @@ async function loadSpots() {
       b.innerHTML = "<span><b></b><small></small></span><i aria-hidden=\"true\"></i>";
       b.querySelector("b").textContent = s.name;
       b.querySelector("small").textContent = `${s.lat.toFixed(4)}, ${s.lon.toFixed(4)}`;
-      b.addEventListener("click", () => { message($("gps-msg"), ""); gpsState("idle"); setPlace(s, s.name); });
+      b.addEventListener("click", () => { cancelGps(); setPlace(s, s.name); });
       return b;
     }));
   } catch (e) {
@@ -117,8 +129,7 @@ $("use-coords").addEventListener("click", () => {
     return message($("coords-msg"), "Type both numbers, like 6.2844 and -0.4612.", true);
   }
   message($("coords-msg"), "");
-  message($("gps-msg"), "");
-  gpsState("idle");
+  cancelGps();
   setPlace({lat, lon, name: "Your spot"}, `${lat.toFixed(4)}, ${lon.toFixed(4)}`);
 });
 
