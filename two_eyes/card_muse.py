@@ -21,8 +21,8 @@ Allowed tags: [A] [B] [C] [D] [E] [F] [GROUND] [MIN].
 Rules:
 - Only write a tagged sentence when that check passed (pass == true). For unknown/null/false, do not write that tag (except [MIN]).
 - [MIN] sentences are the minimum card and always allowed: name the location and state the NDVI change if given.
-- When status is SCAR and checks A and B both passed, also end with exactly: Likely source, not proven.
-- When status is NONE or CLOUDY, or A/B did not pass, never write "Likely source" or "not proven".
+- When status is SCAR and checks A, B, C, D and E all passed, also end with exactly: Likely source, not proven.
+- Otherwise never write "Likely source" or "not proven".
 - No percentages. No accusations against named people. No Twi. Plain English for someone with no science
   background: say what the satellite saw and where the water goes.
 - The tag is only for the app. Never mention checks, check letters, "passed", "pass" or the JSON inside the
@@ -53,11 +53,12 @@ def _public_spot(r):
 
 
 def claims_source(r):
-    """True when a new clearing that drains to this spot was found — hedging then applies."""
+    """True only when the confidence ladder itself reaches "Likely source", so the share text never
+    claims more than the result screen does."""
     if r.get("status") != "SCAR":
         return False
-    checks = r.get("checks") or {}
-    return checks.get("A", {}).get("pass") is True and checks.get("B", {}).get("pass") is True
+    from .case_file import evidence_level
+    return evidence_level(r) >= 3
 
 
 def minimum_card(r):
