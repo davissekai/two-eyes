@@ -2,7 +2,8 @@
 
 Every sentence Muse emits must name the check it rests on (A–F or GROUND).
 Code deletes any sentence whose check did not pass. A minimum card always survives:
-location, NDVI change, and 'Likely source, not proven'.
+location and NDVI change when present. The hedging line 'Likely source, not proven'
+is added only when a clearing that drains to the spot was found.
 """
 import json
 import re
@@ -19,7 +20,9 @@ Allowed tags: [A] [B] [C] [D] [E] [F] [GROUND] [MIN].
 
 Rules:
 - Only write a tagged sentence when that check passed (pass == true). For unknown/null/false, do not write that tag (except [MIN]).
-- [MIN] sentences are the minimum card and always allowed: name the location, state the NDVI change if given, and end with exactly: Likely source, not proven.
+- [MIN] sentences are the minimum card and always allowed: name the location and state the NDVI change if given.
+- When status is SCAR and checks A and B both passed, also end with exactly: Likely source, not proven.
+- When status is NONE or CLOUDY, or A/B did not pass, never write "Likely source" or "not proven".
 - No percentages. No accusations against named people. No Twi. Plain English for someone with no science
   background: say what the satellite saw and where the water goes.
 - The tag is only for the app. Never mention checks, check letters, "passed", "pass" or the JSON inside the
@@ -48,8 +51,17 @@ def _public_spot(r):
     return b
 
 
+
+def claims_source(r):
+    """True when a new clearing that drains to this spot was found — hedging then applies."""
+    if r.get("status") != "SCAR":
+        return False
+    checks = r.get("checks") or {}
+    return checks.get("A", {}).get("pass") is True and checks.get("B", {}).get("pass") is True
+
+
 def minimum_card(r):
-    """Always-surviving lines: location, NDVI change when present, caution."""
+    """Always-surviving lines: location, NDVI change when present; hedging only when a source was found."""
     b = _public_spot(r)
     s = r.get("scar") or {}
     name = b.get("name") or "the filming spot"
@@ -65,7 +77,8 @@ def minimum_card(r):
         )
     elif s.get("area_ha"):
         lines.append(f"New clearing about {s['area_ha']:.1f} ha upstream.")
-    lines.append("Likely source, not proven.")
+    if claims_source(r):
+        lines.append("Likely source, not proven.")
     return lines
 
 
@@ -127,14 +140,22 @@ def write_card(r, use_llm=True):
     # Muse ran but every sentence was dropped → minimum card always survives
     if not sentences:
         return " ".join(min_lines)
-    # Drop Muse lines that duplicate the closing caution; ensure caution present
-    body = [s for s in sentences if "not proven" not in s.lower()]
-    # Prefer Muse body + required caution
-    out = body + [min_lines[-1]]
+    hedge = claims_source(r)
+    # Drop Muse lines that claim a source when the checks don't support it; drop duplicate caution
+    body = []
+    for s in sentences:
+        low = s.lower()
+        if "likely source" in low or "not proven" in low:
+            if hedge:
+                continue  # we'll append the canonical caution once
+            continue  # no source found: never keep hedging claims
+        body.append(s)
+    out = list(body)
+    if hedge:
+        out.append("Likely source, not proven.")
     # Ensure location/NDVI appear somehow
     joined = " ".join(out)
-    if "Likely source, not proven" not in joined:
-        out.append("Likely source, not proven.")
     if not any(x in joined.lower() for x in ("location", "bridge", "ndvi", "clearing", "ha")):
-        out = min_lines[:-1] + out
+        extras = [ln for ln in min_lines if "likely source" not in ln.lower()]
+        out = extras + out
     return " ".join(out)

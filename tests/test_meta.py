@@ -38,14 +38,13 @@ def test_card_muse_minimum_survives_all_checks_fail():
     assert kept  # MIN lines survive
     assert all(not s.startswith("[") for s in kept)
     text = card_muse.write_card(r, use_llm=False)
-    assert "Likely source, not proven" in text
+    # No clearing → never claim a likely source
+    assert "Likely source" not in text and "not proven" not in text
     assert "Test bridge" in text or "NDVI" in text
-    # Even if Muse returned only failing-check sentences, filter + minimum yields caution
     filtered = card_muse._filter_sentences(
         ["[A] Scar.", "[B] Drains here.", "[D] Mining."], r["checks"], allow_ground=False)
     assert filtered == []
-    # write_card without llm returns minimum
-    assert "Likely source, not proven." in card_muse.minimum_card(r)
+    assert "Likely source" not in " ".join(card_muse.minimum_card(r))
 
 
 def test_card_muse_drops_failed_check_sentences():
@@ -142,3 +141,62 @@ def test_unnamed_spot_is_called_the_filming_spot():
     from two_eyes import card_muse
     line = card_muse.minimum_card({"spot": {"name": "Your spot", "lat": 5.65, "lon": -0.28}, "scar": {}})[0]
     assert "Your spot" not in line and "the filming spot" in line
+
+
+def test_share_text_omits_likely_source_when_no_clearing():
+    """A clear / no-scar result must not end with 'Likely source, not proven'."""
+    r = {
+        "status": "NONE",
+        "spot": {"name": "Accra", "lat": 5.556, "lon": -0.197},
+        "scar": {},
+        "checks": {k: {"pass": False} for k in "ABCDEF"},
+        "ground": {"water_found": False},
+    }
+    assert "Likely source" not in " ".join(card_muse.minimum_card(r))
+    out = card_muse.write_card(r, use_llm=False)
+    assert "Likely source" not in out
+    # Muse that wrongly hedges is stripped
+    sentences = ["[MIN] Location: Accra.", "[MIN] Likely source, not proven."]
+    kept = card_muse._filter_sentences(sentences, r["checks"])
+    # write_card path with mocked muse
+    import two_eyes.card_muse as cm
+    class Fake:
+        @staticmethod
+        def respond(*a, **k):
+            return '{"sentences": ["[MIN] Location: Accra (about 5.56, -0.20).", "[MIN] Likely source, not proven."]}'
+        @staticmethod
+        def parse_json(t):
+            import json
+            return json.loads(t)
+    # route through write_card with use_llm True by stubbing muse + SHARE_LLM
+    from two_eyes import config as C
+    old_share = C.SHARE_LLM
+    C.SHARE_LLM = True
+    try:
+        import two_eyes.muse as muse_mod
+        real_respond, real_parse = muse_mod.respond, muse_mod.parse_json
+        muse_mod.respond = Fake.respond
+        muse_mod.parse_json = Fake.parse_json
+        try:
+            text = card_muse.write_card(r, use_llm=True)
+        finally:
+            muse_mod.respond, muse_mod.parse_json = real_respond, real_parse
+    finally:
+        C.SHARE_LLM = old_share
+    assert "Likely source" not in text
+    assert "Accra" in text or "Location" in text
+
+
+def test_share_text_keeps_likely_source_when_scar_drains_here():
+    r = {
+        "status": "SCAR",
+        "spot": {"name": "Birim, N4 bridge", "lat": 6.28442, "lon": -0.46118},
+        "scar": {"ndvi_before": 0.72, "ndvi_after": 0.18, "area_ha": 17.0},
+        "checks": {"A": {"pass": True}, "B": {"pass": True}, "C": {"pass": None},
+                   "D": {"pass": True}, "E": {"pass": None}, "F": {"pass": False}},
+        "ground": {"water_found": True, "label": "muddy brown"},
+    }
+    assert card_muse.claims_source(r) is True
+    assert "Likely source, not proven." in card_muse.minimum_card(r)
+    assert "Likely source, not proven" in card_muse.write_card(r, use_llm=False)
+

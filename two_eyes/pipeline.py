@@ -63,17 +63,21 @@ def _cache_key(lat, lon, focus):
 
 
 def river_point(lat, lon, log=print):
-    """Where the trace starts: the spot snapped onto the nearest mapped river, or the spot itself.
+    """Where the trace starts: the spot snapped onto the nearest mapped river.
 
-    A failed lookup never stops a check; it only means the trace starts from the phone's position.
+    No mapped river within SNAP_MAX_M → raise NoRiverHere (do not invent a distant basin).
+    An Earth Engine / lookup error is different: we keep the phone's position and continue.
     """
+    from .trace import NoRiverHere
     try:
         s = snap.snap_to_river(lat, lon)
     except Exception as ex:
         log(f"River snap skipped: {type(ex).__name__}")
         return lat, lon, {"moved_m": 0, "ambiguous": False, "error": type(ex).__name__}
     if s is None:
-        return lat, lon, {"moved_m": 0, "ambiguous": False, "note": "no mapped river within %d m" % C.SNAP_MAX_M}
+        raise NoRiverHere(
+            f"No river within {C.SNAP_MAX_M} m of this spot. "
+            "Stand nearer the water and try again.")
     if s["ambiguous"]:
         log("Two rivers meet near the filming spot; following the nearest one.")
     return s["lat"], s["lon"], s

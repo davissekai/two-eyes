@@ -168,11 +168,19 @@ def test_desktop_css_is_wider_than_phone(client):
     assert "max-width:1100px" in css or "max-width: 1100px" in css
     assert "@media (min-width:900px)" in css or "@media (min-width: 900px)" in css
     assert "max-width:480px" in css  # mobile shell kept
+    # Desktop shell must not clip the sticky CTA below the fold.
+    desktop = css.split("@media (min-width:900px)", 1)[1].split("@media", 1)[0]
+    app_rule = desktop.split(".app", 1)[1].split("}", 1)[0]
+    assert "overflow" not in app_rule
+    assert 'data-screen="start"' in css
+    assert "Start a check" in client.get("/").text
 
 
 def test_failures_are_explained_in_plain_words():
     from two_eyes.trace import NoRiverHere
     from two_eyes.web import server
     assert "river" in server._plain_reason(NoRiverHere("We couldn't find land that drains to a river")).lower()
+    msg = "No river within 300 m of this spot. Stand nearer the water and try again."
+    assert server._plain_reason(NoRiverHere(msg)) == msg
     assert server._plain_reason(RuntimeError("boom")) == server.FAIL_REASON
     assert "boom" not in server._plain_reason(RuntimeError("boom"))

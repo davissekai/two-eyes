@@ -103,3 +103,30 @@ def test_case_file_warns_when_two_rivers_meet_here():
 def test_pieces_of_the_same_river_are_not_two_rivers():
     s = snap.choose([_reach(1, 20, 1600), _reach(1, 40, 1600)])
     assert not s["ambiguous"]
+
+def test_no_river_nearby_stops_the_check(monkeypatch):
+    """Accra-style: no HydroRIVERS reach within SNAP_MAX_M → clear failure, not a distant basin."""
+    from two_eyes import pipeline
+    from two_eyes.trace import NoRiverHere
+    monkeypatch.setattr(snap, "snap_to_river", lambda lat, lon: None)
+    with pytest.raises(NoRiverHere, match=r"No river within 300 m"):
+        pipeline.river_point(5.556, -0.197, log=lambda *a: None)
+
+
+def test_sky_part_does_not_invent_a_basin_far_from_the_spot(monkeypatch):
+    """When the snap is None, sky_part must raise before Basins.basin_of runs."""
+    from two_eyes import pipeline
+    from two_eyes.trace import NoRiverHere
+    called = {"basins": False}
+    monkeypatch.setattr(snap, "snap_to_river", lambda lat, lon: None)
+
+    class BoomBasins:
+        def __init__(self, *a, **k):
+            called["basins"] = True
+            raise AssertionError("Basins must not run when snap is None")
+
+    monkeypatch.setattr(pipeline, "Basins", BoomBasins)
+    with pytest.raises(NoRiverHere, match="Stand nearer the water"):
+        pipeline.sky_part(5.556, -0.197, log=lambda *a: None)
+    assert called["basins"] is False
+
