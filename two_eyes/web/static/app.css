@@ -120,8 +120,16 @@ img {max-width:100%;}
 .btn.gps b {display:block; font-size:18px;}
 .btn.gps small {display:block; font-weight:400; font-size:14px; color:var(--laterite);}
 .btn.gps.busy svg {animation:spin 1.2s linear infinite;}
-.btn.gps.ok {border-color:var(--graphite); background:var(--graphite); color:var(--bone);}
-.btn.gps.ok svg {stroke:var(--lime);} .btn.gps.ok small {color:var(--silt);}
+.btn.gps .gps-check, .btn.gps .again {display:none;}
+.btn.gps.ok {border-color:var(--graphite); background:var(--graphite); color:var(--bone); min-height:92px;
+  animation:found .35s ease-out;}
+.btn.gps.ok .gps-icon {display:none;}
+.btn.gps.ok .gps-check {display:block; fill:var(--lime); stroke:var(--graphite); stroke-width:2.4;
+  stroke-linecap:round; stroke-linejoin:round;}
+.btn.gps.ok b {font-size:20px;}
+.btn.gps.ok small {color:var(--bone); font:13.5px JB,monospace; margin-top:2px;}
+.btn.gps.ok .again {display:block; font-style:normal; font-weight:400; font-size:13px; color:var(--silt); margin-top:4px;}
+@keyframes found {0% {transform:scale(.97);} 60% {transform:scale(1.015);} 100% {transform:none;}}
 @keyframes spin {to {transform:rotate(360deg);}}
 :focus-visible {outline:3px solid var(--graphite); outline-offset:2px;}
 
@@ -146,6 +154,9 @@ img {max-width:100%;}
 .coords input {min-height:48px; border:1px solid var(--ruler); border-radius:12px; background:var(--panel);
   padding:0 12px; font:15px JB,monospace; width:100%;}
 .chosen {margin:0; font-size:14px; text-align:center;}
+.chosen::before {content:"✓"; display:inline-grid; place-items:center; width:18px; height:18px; margin-right:6px;
+  border-radius:99px; background:var(--lime); color:var(--graphite); font-size:12px; font-weight:700;
+  vertical-align:-3px;}
 .chosen b {font-weight:600;}
 
 .film-box {border:1px solid var(--ruler); border-radius:16px; background:var(--panel); padding:16px; overflow:hidden;}
@@ -175,3 +186,12 @@ img {max-width:100%;}
 
 /* headings get focus on each screen change for screen readers; no box around them for sighted users */
 [tabindex="-1"]:focus {outline:none;}
+
+/* Check it yourself: outside sources, each a full-width tap target that leaves the app. */
+.check-links ul {list-style:none; margin:10px 0 0; padding:0; display:grid; gap:8px;}
+.check-links a {display:grid; grid-template-columns:1fr auto; align-items:center; gap:2px 12px; min-height:56px;
+  padding:12px 14px; border:1px solid var(--ruler); border-radius:12px; background:var(--bone);
+  color:var(--graphite); text-decoration:none;}
+.check-links a::after {content:"↗"; grid-row:span 2; grid-column:2; font-size:18px; color:var(--laterite);}
+.check-links a:active {transform:scale(.985);}
+.check-links small {grid-column:1; font-size:13px; color:var(--laterite);}

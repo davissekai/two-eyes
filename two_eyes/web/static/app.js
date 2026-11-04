@@ -45,7 +45,32 @@ function setPlace(place, how) {
   if (place) $("chosen").querySelector("b").textContent = how;
   document.querySelectorAll(".spot").forEach((b) =>
     b.setAttribute("aria-checked", String(!!place && b.dataset.name === place.name)));
-  $("gps").classList.remove("ok");
+}
+
+const GPS_IDLE = ["Use my location", "Your phone's GPS finds the river you're at"];
+const ROUGH_FIX_M = 1000;
+// Bumped on every GPS ask and every manual pick; a GPS answer only counts if nothing came after its ask.
+let gpsTicket = 0;
+
+// Drops any GPS answer still on its way and resets the button, because the person chose a place by hand.
+function cancelGps() {
+  gpsTicket += 1;
+  gpsState("idle");
+  message($("gps-msg"), "");
+}
+
+// Puts the GPS button in one of its states: idle, busy (looking) or ok (found, showing where and how close).
+function gpsState(kind, [title, sub] = GPS_IDLE) {
+  const btn = $("gps");
+  btn.classList.toggle("busy", kind === "busy");
+  btn.classList.toggle("ok", kind === "ok");
+  btn.querySelector("b").textContent = title;
+  btn.querySelector("small").textContent = sub;
+}
+
+// Accuracy in words a person reads at a glance: metres when close, km when rough.
+function distance(m) {
+  return m < ROUGH_FIX_M ? `${Math.round(m)} m` : `${Math.round(m / 100) / 10} km`;
 }
 
 function message(el, text, bad) {
@@ -56,20 +81,24 @@ function message(el, text, bad) {
 
 // Asks the phone for its position and says plainly what happened. Needs https (or localhost).
 $("gps").addEventListener("click", () => {
-  const btn = $("gps"), msg = $("gps-msg"), title = btn.querySelector("b");
+  const msg = $("gps-msg");
   if (!navigator.geolocation || !window.isSecureContext) {
     return message(msg, "This page can't use your location (it needs a secure https link). Pick a spot below.", true);
   }
-  btn.classList.add("busy"); btn.classList.remove("ok"); title.textContent = "Finding you…";
+  const ticket = ++gpsTicket;
+  gpsState("busy", ["Finding you…", "Hold on, this can take a few seconds"]);
   message(msg, "");
   navigator.geolocation.getCurrentPosition((p) => {
+    if (ticket !== gpsTicket) return;
     const c = p.coords;
-    btn.classList.remove("busy"); btn.classList.add("ok"); title.textContent = "Location found";
-    message(msg, `${c.latitude.toFixed(4)}, ${c.longitude.toFixed(4)}, within about ${Math.round(c.accuracy)} m.`);
     setPlace({lat: c.latitude, lon: c.longitude, name: "Your spot"}, "your GPS position");
-    btn.classList.add("ok");
+    gpsState("ok", ["Location found",
+      `${c.latitude.toFixed(4)}, ${c.longitude.toFixed(4)} · within ${distance(c.accuracy)}`]);
+    message(msg, c.accuracy >= ROUGH_FIX_M
+      ? "That's a rough fix. If you can, step into the open and tap again, or pick a spot below." : "");
   }, (e) => {
-    btn.classList.remove("busy"); title.textContent = "Use my location";
+    if (ticket !== gpsTicket) return;
+    gpsState("idle");
     message(msg, e.code === 1
       ? "Location is blocked. Allow location for this site in your browser settings, or pick a spot below."
       : "Couldn't get a GPS fix. Try again in the open, away from buildings, or pick a spot below.", true);
@@ -86,7 +115,7 @@ async function loadSpots() {
       b.innerHTML = "<span><b></b><small></small></span><i aria-hidden=\"true\"></i>";
       b.querySelector("b").textContent = s.name;
       b.querySelector("small").textContent = `${s.lat.toFixed(4)}, ${s.lon.toFixed(4)}`;
-      b.addEventListener("click", () => { message($("gps-msg"), ""); setPlace(s, s.name); });
+      b.addEventListener("click", () => { cancelGps(); setPlace(s, s.name); });
       return b;
     }));
   } catch (e) {
@@ -100,6 +129,7 @@ $("use-coords").addEventListener("click", () => {
     return message($("coords-msg"), "Type both numbers, like 6.2844 and -0.4612.", true);
   }
   message($("coords-msg"), "");
+  cancelGps();
   setPlace({lat, lon, name: "Your spot"}, `${lat.toFixed(4)}, ${lon.toFixed(4)}`);
 });
 
@@ -235,7 +265,7 @@ async function poll() {
 
 function showResult(res) {
   state.result = res;
-  for (const k of ["verdict", "trace", "eyes", "preview"]) $(k).innerHTML = res[k] || "";
+  for (const k of ["verdict", "trace", "eyes", "links", "preview"]) $(k).innerHTML = res[k] || "";
   $("next-steps").innerHTML = res.next_steps || "";
   $("share-buttons").innerHTML = res.share_html || "";
   $("save-card").href = res.card_url;

@@ -16,7 +16,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from .. import case_file, demo, pipeline, readout
+from .. import case_file, demo, evidence_links, pipeline, readout
 from .. import share as share_ui
 from ..app import DEMO_SPOTS
 from ..look import ASSETS, page_css
@@ -48,6 +48,7 @@ def _result(job_id, r):
         "verdict": case_file.verdict_html(r),
         "trace": case_file.trace_html(r) if case_file.evidence_level(r) else "",
         "eyes": case_file.eyes_html(r),
+        "links": evidence_links.links_html(r),
         "preview": share_ui.preview_html(r["share_text"], r["card_png"]),
         "share_html": share_ui.buttons_html(r["share_text"]),
         "next_steps": share_ui.next_steps_html(),

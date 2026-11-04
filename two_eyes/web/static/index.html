@@ -49,9 +49,12 @@
       <h2 id="where-h" class="title">Where are you?</h2>
       <p class="sub">Stand somewhere safe and public by the water: a bridge, a bank, a ferry landing.</p>
       <button class="btn gps" id="gps" type="button">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/>
+        <svg class="gps-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/>
           <path d="M12 1v4M12 19v4M1 12h4M19 12h4"/></svg>
-        <span><b>Use my location</b><small>Your phone's GPS finds the river you're at</small></span>
+        <svg class="gps-check" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/>
+          <path d="M6.8 12.4l3.4 3.4 7-7.2"/></svg>
+        <span aria-live="polite"><b>Use my location</b><small>Your phone's GPS finds the river you're at</small>
+          <em class="again">Tap to find again</em></span>
       </button>
       <p class="gps-msg" id="gps-msg" aria-live="polite" hidden></p>
 
@@ -128,6 +131,7 @@
       <h3 class="section-title">The evidence</h3>
       <div id="trace"></div>
       <div id="eyes"></div>
+      <div id="links"></div>
     </div>
     <div class="actions">
       <button class="btn primary" type="button" data-go="share">Share the evidence card</button>
