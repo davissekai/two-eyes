@@ -192,11 +192,27 @@ def test_share_text_keeps_likely_source_when_scar_drains_here():
         "status": "SCAR",
         "spot": {"name": "Birim, N4 bridge", "lat": 6.28442, "lon": -0.46118},
         "scar": {"ndvi_before": 0.72, "ndvi_after": 0.18, "area_ha": 17.0},
-        "checks": {"A": {"pass": True}, "B": {"pass": True}, "C": {"pass": None},
-                   "D": {"pass": True}, "E": {"pass": None}, "F": {"pass": False}},
+        "checks": {"A": {"pass": True}, "B": {"pass": True}, "C": {"pass": True},
+                   "D": {"pass": True}, "E": {"pass": True}, "F": {"pass": False}},
         "ground": {"water_found": True, "label": "muddy brown"},
     }
     assert card_muse.claims_source(r) is True
     assert "Likely source, not proven." in card_muse.minimum_card(r)
     assert "Likely source, not proven" in card_muse.write_card(r, use_llm=False)
 
+
+
+def test_share_text_no_likely_source_when_only_clearing_confirmed():
+    """Ladder at "Clearing confirmed" (mining seen, river below not measured): share text must not say likely source."""
+    r = {
+        "status": "SCAR",
+        "spot": {"name": "Black Volta", "lat": 8.153, "lon": -2.034},
+        "scar": {"ndvi_before": 0.72, "ndvi_after": 0.18, "area_ha": 5.1},
+        "checks": {"A": {"pass": True}, "B": {"pass": True}, "C": {"pass": True},
+                   "D": {"pass": True}, "E": {"pass": None}, "F": {"pass": False}},
+        "ground": {"water_found": True, "label": "muddy brown"},
+    }
+    assert card_muse.claims_source(r) is False
+    assert "Likely source" not in " ".join(card_muse.minimum_card(r))
+    text = card_muse.write_card(r, use_llm=False)
+    assert "Likely source" not in text and "not proven" not in text
