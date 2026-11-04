@@ -34,7 +34,7 @@ MAX_SEARCH_KM2 = 600         # cap on the upstream area searched (keeps EE calls
 
 # --- Snapping the filming spot onto the river (not a scar cut-off) ---
 HYRIVERS = "WWF/HydroSHEDS/v1/FreeFlowingRivers"   # HydroRIVERS lines; rivers draining >= 10 km² only
-SNAP_MAX_M = 300             # farther than this from a mapped river: keep the phone's position
+SNAP_MAX_M = 300             # farther than this from a mapped river: stop with NoRiverHere
 SNAP_AMBIGUOUS_M = 150       # another river within this of the nearest one: ask which
 
 # --- Check C: outside confirmation ---

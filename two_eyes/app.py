@@ -117,7 +117,10 @@ def run_live(spot, lat, lon, clip):
                                     clip_credit=HERO_CREDIT if clip else None,
                                     log=lambda *a: q.put(" ".join(map(str, a))))
         except Exception as ex:
-            box["error"] = f"Something failed: {type(ex).__name__}: {ex}"
+            from .trace import NoRiverHere
+            # Friendly, actionable copy for the person; keep type only for other failures.
+            box["error"] = str(ex) if isinstance(ex, NoRiverHere) else (
+                f"Something failed: {type(ex).__name__}: {ex}")
 
     t0, worker = time.time(), threading.Thread(target=work, daemon=True)
     worker.start()
@@ -128,8 +131,13 @@ def run_live(spot, lat, lon, clip):
             continue
         yield readout.html(lines, finished=False), "\n".join(lines), None
     if "error" in box:
-        lines += [box["error"], "Offline? Set DEMO_MODE=1 to use the recorded offline demo (explicit flag only)."]
-        yield readout.html(lines, finished=True, failed=True), "\n".join(lines), None
+        reason = box["error"]
+        # NoRiverHere already says what to do; don't append the offline tip over it.
+        if not reason.startswith("No river within"):
+            lines += [reason, "Offline? Set DEMO_MODE=1 to use the recorded offline demo (explicit flag only)."]
+        else:
+            lines.append(reason)
+        yield readout.html(lines, finished=True, failed=True, reason=reason), "\n".join(lines), None
         return
     yield (readout.html(lines, finished=True, elapsed_s=time.time() - t0), "\n".join(lines),
            sections(box["r"]))

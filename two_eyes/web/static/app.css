@@ -21,8 +21,20 @@ img {max-width:100%;}
   .app {background:var(--bone); box-shadow:0 0 0 1px var(--ruler), 0 30px 80px rgba(21,19,15,.12);}
 }
 @media (min-width:900px) {
-  .app {max-width:1100px; border-radius:18px; margin:24px auto; min-height:calc(100dvh - 48px);
-    overflow:hidden;}
+  /* Do not clip the shell: clipping defeats the sticky footer and hides the primary CTA. */
+  .app {max-width:1100px; border-radius:18px; margin:24px auto; min-height:calc(100dvh - 48px);}
+  /* Start screen: photo beside the pitch so "Start a check" stays above the fold. */
+  .screen[data-screen="start"] .body {
+    display:grid; grid-template-columns:minmax(280px, 1.05fr) minmax(280px, 1fr);
+    gap:20px 36px; align-items:center; flex:1; padding-bottom:8px;}
+  .screen[data-screen="start"] .start-photo {
+    grid-column:1; grid-row:1 / span 3; margin:0; border-radius:16px; border:1px solid var(--ruler);
+    aspect-ratio:4/5; max-height:min(520px, calc(100dvh - 220px)); width:100%; overflow:hidden;}
+  .screen[data-screen="start"] .start-photo img {width:100%; height:100%; object-fit:cover; display:block;}
+  .screen[data-screen="start"] .display {grid-column:2; font-size:clamp(40px, 4.2vw, 56px); margin:0;}
+  .screen[data-screen="start"] .lede {grid-column:2; margin:0;}
+  .screen[data-screen="start"] .safe {grid-column:2;}
+  .screen[data-screen="start"] .actions {position:sticky; bottom:0;}
   .screen[data-screen="where"] .body,
   .screen[data-screen="film"] .body {
     display:grid; grid-template-columns:1fr 1fr; gap:24px 32px; align-content:start;}
