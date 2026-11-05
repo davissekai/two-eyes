@@ -142,6 +142,13 @@ async def _save_clip(clip):
     return path
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    """Browsers request /favicon.ico before they read the icon link. The PNG icons live under /static."""
+    return FileResponse(os.path.join(STATIC, "favicon.ico"), media_type="image/x-icon",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/", response_class=HTMLResponse)
 def index():
     with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:

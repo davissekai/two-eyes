@@ -16,12 +16,18 @@ img {max-width:100%;}
 
 /* Narrow: phone column. Wide: desktop shell with multi-column screens. */
 .app {max-width:480px; margin:0 auto; min-height:100dvh; display:flex; flex-direction:column; position:relative;}
+@supports (overflow: clip) {
+  /* Steps slide in by 18px. That slide is wider than a phone, so the page grows a horizontal scrollbar.
+     clip contains it and does not become a scroll container, so the sticky header and thumb-bar still stick.
+     overflow:hidden would not: it traps the sticky footer. */
+  .app {overflow-x:clip;}
+}
 @media (min-width:600px) {
   body {background:var(--panel2);}
   .app {background:var(--bone); box-shadow:0 0 0 1px var(--ruler), 0 30px 80px rgba(21,19,15,.12);}
 }
 @media (min-width:900px) {
-  /* Do not clip the shell: clipping defeats the sticky footer and hides the primary CTA. */
+  /* Do not put overflow:hidden on this shell. It becomes a scroll container and the sticky footer stops sticking. */
   .app {max-width:1100px; border-radius:18px; margin:24px auto; min-height:calc(100dvh - 48px);}
   /* Start screen: photo beside the pitch so "Start a check" stays above the fold. */
   .screen[data-screen="start"] .body {
@@ -101,6 +107,16 @@ img {max-width:100%;}
 
 .start-photo {margin:0 calc(-1 * var(--gutter)); border-radius:0; border-left:0; border-right:0; aspect-ratio:16/10;}
 .start-photo .tag {left:auto; right:16px; top:auto; bottom:30px;}
+/* Photo credit sits on the picture. 10px bone type with a 1px shadow disappears on the mud and the trees.
+   On a phone the line is too long to sit beside the tag, so the tag lifts and the credit uses the width. */
+.photo .cap {left:12px; bottom:12px; max-width:calc(100% - 168px);
+  font:500 13px/1.35 JB,'JetBrains Mono',monospace; letter-spacing:0;
+  color:var(--bone); background:rgba(21,19,15,.84); padding:5px 8px; border-radius:6px;
+  text-shadow:0 1px 2px rgba(21,19,15,.65); text-wrap:balance;}
+@media (max-width:420px) {
+  .photo .cap {max-width:calc(100% - 24px);}
+  .start-photo .tag {bottom:74px;}
+}
 .safe {list-style:none; margin:4px 0 0; padding:0; display:flex; flex-wrap:wrap; gap:8px;}
 .safe li {font-size:13px; border:1px solid var(--ruler); border-radius:99px; padding:5px 11px;}
 
