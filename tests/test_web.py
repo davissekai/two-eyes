@@ -43,6 +43,12 @@ def test_app_shell_and_install_files_are_served(client):
     assert client.get("/sw.js").status_code == 200
     assert "--bone" in client.get("/static/app.css").text
     assert ".verdict" in client.get("/page.css").text
+    icon = client.get("/favicon.ico")
+    assert icon.status_code == 200
+    assert icon.headers["content-type"].startswith("image/")
+    assert icon.content[:4] == b"\x00\x00\x01\x00"  # ICO header
+    css = client.get("/static/app.css").text
+    assert "overflow-x:clip" in css or "overflow-x: clip" in css
 
 
 def test_spots_people_have_checked_are_listed(client):
